@@ -1,4 +1,5 @@
 -- leaked by https://discord.gg/F4eknseBRK join for more sources
+print("SCRIPT EXECUTED")
 
 -- ══════════════════════════════════════════
 -- SERVICES
@@ -12,7 +13,18 @@ local Stats              = game:GetService("Stats")
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService         = game:GetService("GuiService")
 
+if not RunService:IsClient() then
+    warn("NOT RUNNING ON CLIENT - UI WILL NOT SHOW")
+    return
+end
+
 local lp     = Players.LocalPlayer
+if not lp then return end
+local playerGui = lp:FindFirstChild("PlayerGui") or lp:WaitForChild("PlayerGui", 10)
+if not playerGui then
+    warn("FAILED TO GET PlayerGui")
+    return
+end
 local player = lp
 
 -- ══════════════════════════════════════════
@@ -1133,13 +1145,13 @@ player.CharacterAdded:Connect(setupCharacter)
 
 -- Clean existing GUIs
 for _, n in ipairs({"UGC_Duels","UGC_SpeedCustomizer"}) do
-    if lp.PlayerGui:FindFirstChild(n) then lp.PlayerGui[n]:Destroy() end
+    if playerGui:FindFirstChild(n) then playerGui[n]:Destroy() end
 end
 
 -- ══════════════════════════════════════════
 -- SPEED CUSTOMIZER (sub-window, style script2)
 -- ══════════════════════════════════════════
-local scGui = Instance.new("ScreenGui"); scGui.Name="UGC_SpeedCustomizer"; scGui.ResetOnSpawn=false; scGui.Enabled=false; scGui.Parent=lp:WaitForChild("PlayerGui")
+local scGui = Instance.new("ScreenGui"); scGui.Name="UGC_SpeedCustomizer"; scGui.ResetOnSpawn=false; scGui.Enabled=false; scGui.Parent=playerGui
 
 local scFrame = Instance.new("Frame"); scFrame.Name="MainFrame"
 scFrame.Size=UDim2.new(0,240,0,200); scFrame.AnchorPoint=Vector2.new(1,0.5)
@@ -1269,8 +1281,9 @@ local autoBatActive=false; local autoBatLoop=nil; local savedAnimate=nil
 -- ══════════════════════════════════════════
 -- MAIN SCREEN GUI
 -- ══════════════════════════════════════════
-local sg=Instance.new("ScreenGui"); sg.Name="UGC_Duels"; sg.ResetOnSpawn=false; sg.Parent=lp:WaitForChild("PlayerGui")
-sg.IgnoreGuiInset = true
+local success, err = pcall(function()
+local sg=Instance.new("ScreenGui"); sg.Name="UGC_Duels"; sg.ResetOnSpawn=false; sg.IgnoreGuiInset=true; sg.Parent=playerGui
+print("MAIN UI CREATED")
 
 -- Progress bar
 local pbBg=Instance.new("Frame"); pbBg.Size=UDim2.new(0,260,0,13); pbBg.Position=UDim2.new(0.5,-130,0,8)
@@ -1644,3 +1657,26 @@ dcBtn.TextColor3=Color3.fromRGB(130,130,130); dcBtn.Parent=dcRow
 dcBtn.MouseButton1Click:Connect(function() pcall(function() setclipboard("https://discord.gg/F4eknseBRK") end); dcBtn.Text="✅  Copied!"; task.wait(1.5); dcBtn.Text="📋  https://discord.gg/F4eknseBRK" end)
 
 ShowSection("Combat")
+end)
+
+if not success then
+    warn("UI CREATION FAILED:", err)
+end
+
+task.delay(1, function()
+    if not playerGui:FindFirstChild("UGC_Duels") then
+        warn("UI DID NOT CREATE - FORCING TEST BUTTON")
+
+        local test = Instance.new("ScreenGui")
+        test.Name = "TEST_GUI"
+        test.Parent = playerGui
+
+        local btn = Instance.new("TextLabel")
+        btn.Size = UDim2.new(0,200,0,50)
+        btn.Position = UDim2.new(0.5,-100,0.5,-25)
+        btn.Text = "SCRIPT RUNNING"
+        btn.BackgroundColor3 = Color3.new(1,0,0)
+        btn.TextColor3 = Color3.new(1,1,1)
+        btn.Parent = test
+    end
+end)
