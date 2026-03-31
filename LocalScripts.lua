@@ -1514,6 +1514,8 @@ RunService.Heartbeat:Connect(function()
 end)
 
 local autoStealEnabled=false; local grabRadius=50
+local stealCooldown = 0.2
+local HOLD_DURATION = 0.5
 local stealCircle=nil
 local function hideStealCircle() if stealCircle then stealCircle:Destroy(); stealCircle=nil end end
 local function updateStealCircle()
@@ -1529,11 +1531,35 @@ local function createStealCircle(r)
         stealCircle.Shape=Enum.PartType.Cylinder; stealCircle.Size=Vector3.new(0.05,r*2,r*2); stealCircle.Parent=workspace
     else stealCircle.Size=Vector3.new(0.05,r*2,r*2) end
 end
-local function findNearestSteal(root)
+local function getPromptPart(prompt)
+    if not prompt then return nil end
+    local parent = prompt.Parent
+    if parent and parent:IsA("BasePart") then
+        return parent
+    end
+    if parent and parent:IsA("Attachment") then
+        local attached = parent.Parent
+        if attached and attached:IsA("BasePart") then
+            return attached
+        end
+    end
+    local model = prompt:FindFirstAncestorWhichIsA("Model")
+    if model then
+        return model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+    end
+    return prompt:FindFirstAncestorWhichIsA("BasePart")
+end
+local function findNearestStealPrompt()
+    local char = lp.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return nil end
+
     local nearest,dist=nil,math.huge
-    for _,desc in ipairs(workspace:GetDescendants()) do
+    for _,desc in ipairs(plots:GetDescendants()) do
         if desc:IsA("ProximityPrompt") and desc.Enabled and desc.ActionText=="Steal" then
-            local part=desc.Parent:IsA("BasePart") and desc.Parent or desc:FindFirstAncestorWhichIsA("BasePart")
+            local part=getPromptPart(desc)
             if part then local d=(part.Position-root.Position).Magnitude; if d<dist and d<=grabRadius then nearest=desc; dist=d end end
         end
     end; return nearest
@@ -1914,23 +1940,32 @@ AddToggle("Combat","Auto Steal Nearest",
         local uc=RunService.RenderStepped:Connect(updateStealCircle)
         task.spawn(function()
             while autoStealEnabled do
-                local char=lp.Character
+                local char = lp.Character
                 if char then
-                    local root=char:FindFirstChild("HumanoidRootPart")
+                    local root = char:FindFirstChild("HumanoidRootPart")
                     if root then
-                        local prompt=findNearestSteal(root)
+                        local prompt = findNearestStealPrompt()
                         if prompt then
-                            pbBg.Visible=true; local st=tick()
-                            while autoStealEnabled and findNearestSteal(root)==prompt do
-                                local p=math.clamp((tick()-st)/1.2,0,1)
-                                pbFill.Size=UDim2.new(p,0,1,0); pbPct.Text=math.floor(p*100).."%"
-                                if p>=0.99 then pcall(fireproximityprompt,prompt); task.wait(0.1); pcall(fireproximityprompt,prompt); st=tick() end
-                                task.wait()
+                            prompt.MaxActivationDistance = 9e9
+                            prompt.RequiresLineOfSight = false
+                            prompt.ClickablePrompt = true
+
+                            local success = pcall(function()
+                                fireproximityprompt(prompt, 9e9, HOLD_DURATION)
+                            end)
+
+                            if not success then
+                                pcall(function()
+                                    prompt:InputHoldBegin()
+                                    task.wait(HOLD_DURATION)
+                                    prompt:InputHoldEnd()
+                                end)
                             end
                         end
                     end
                 end
-                resetBar(); task.wait(0.15)
+                resetBar()
+                task.wait(stealCooldown)
             end
             resetBar(true); hideStealCircle(); if uc then uc:Disconnect() end
         end)
