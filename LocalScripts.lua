@@ -844,74 +844,226 @@ local function removeSpinButton()
     positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
 end
 
--- ─── AUTO WALK ──────────────────────────────────────────
-local autoWalkEnabled=false; local walkGui=nil; local walkRunning=false; local walkSpeedConn=nil
-local function createAutoWalkGui()
-    if walkGui then return end
-    walkGui=Instance.new("ScreenGui"); walkGui.Name="UGC_WalkGui"; walkGui.ResetOnSpawn=false; walkGui.IgnoreGuiInset=true; walkGui.Parent=game:GetService("CoreGui")
-    local button=Instance.new("TextButton")
-    button.Size=UDim2.new(0,160,0,52)
-    button.BackgroundColor3=BTN_DARK; button.Text="🚶  AUTO WALK"; button.Font=Enum.Font.GothamBlack
-    button.TextSize=13; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Active=true; button.Parent=walkGui
-    button.Selectable=false
-    button.ZIndex = 20
-    Instance.new("UICorner",button).CornerRadius=UDim.new(0,13)
-    local bs=Instance.new("UIStroke",button); bs.Color=STROKE_OFF; bs.Thickness=1.5
-    local routes = {
-        START_A={StartPoint=Vector3.new(-475.92,-7.02,99.32),Route={Vector3.new(-476.14,-6.90,25.66),Vector3.new(-482.98,-5.27,24.82)}},
-        START_B={StartPoint=Vector3.new(-476.72,-6.60,25.47),Route={Vector3.new(-476.80,-6.57,94.64),Vector3.new(-482.82,-5.27,94.81)}},
-    }
-    local function getClosestRoute()
-        local char=player.Character; if not char then return nil end
-        local root=char:FindFirstChild("HumanoidRootPart"); if not root then return nil end
-        local cl,sh=nil,math.huge
-        for _,data in pairs(routes) do local d=(root.Position-data.StartPoint).Magnitude; if d<sh then sh=d; cl=data end end
-        return cl
+local speedBox, stealBox
+
+-- ─── AUTO PLAY ──────────────────────────────────────────
+local SETTINGS={AUTOLEFT=false,AUTORIGHT=false,STEAL_SPEED=29.40}
+local autoPlayEnabled=false; local autoPlayGui=nil; local autoPlayHeartbeatConn=nil; local autoPlayRespawnConn=nil
+local autoPlayLeftBtn=nil; local autoPlayRightBtn=nil; local autoPlayLeftStroke=nil; local autoPlayRightStroke=nil
+local LeftPhase, RightPhase = 1, 1
+local LeftStartPos, RightStartPos = nil, nil
+
+local L_POS_1      = Vector3.new(-476.48, -6.28, 92.73)
+local L_POS_END    = Vector3.new(-483.12, -4.95, 94.80)
+local L_POS_RETURN = Vector3.new(-475, -8, 19)
+local L_POS_FINAL  = Vector3.new(-488, -6, 19)
+
+local R_POS_1      = Vector3.new(-476.16, -6.52, 25.62)
+local R_POS_END    = Vector3.new(-483.04, -5.09, 23.14)
+local R_POS_RETURN = Vector3.new(-476, -8, 99)
+local R_POS_FINAL  = Vector3.new(-488, -6, 102)
+
+local function getAutoPlaySpeeds()
+    local normalSpeed = 59.9
+    local stealSpeed = 29.9
+    if typeof(speedBox)=="Instance" then
+        local n=tonumber(speedBox.Text)
+        if n and n>0 then normalSpeed=n end
     end
-    local function blockMove() ContextActionService:BindAction("BlockMoveAW",function() return Enum.ContextActionResult.Sink end,false,Enum.PlayerActions.CharacterForward,Enum.PlayerActions.CharacterBackward,Enum.PlayerActions.CharacterLeft,Enum.PlayerActions.CharacterRight,Enum.PlayerActions.CharacterJump) end
-    local function unblockMove() ContextActionService:UnbindAction("BlockMoveAW") end
-    local function forceSpeed(hm) if walkSpeedConn then walkSpeedConn:Disconnect() end; walkSpeedConn=RunService.RenderStepped:Connect(function() if hm and hm.Parent then hm.WalkSpeed=52 end end) end
-    local function stopSpeed(hm) if walkSpeedConn then walkSpeedConn:Disconnect(); walkSpeedConn=nil end; if hm then hm.WalkSpeed=16 end end
-    local function moveToPoint(pt)
+    if typeof(stealBox)=="Instance" then
+        local s=tonumber(stealBox.Text)
+        if s and s>0 then stealSpeed=s end
+    elseif tonumber(SETTINGS.STEAL_SPEED) and SETTINGS.STEAL_SPEED>0 then
+        stealSpeed=SETTINGS.STEAL_SPEED
+    end
+    return normalSpeed, stealSpeed
+end
+
+local function getCurrentAutoPlayTarget(side, phase)
+    if side=="Left" then
+        if phase==1 then return L_POS_1 end
+        if phase==2 then return L_POS_END end
+        if phase==3 then return L_POS_1 end
+        if phase==4 then return L_POS_RETURN end
+        if phase==5 then return L_POS_FINAL end
+    elseif side=="Right" then
+        if phase==1 then return R_POS_1 end
+        if phase==2 then return R_POS_END end
+        if phase==3 then return R_POS_1 end
+        if phase==4 then return R_POS_RETURN end
+        if phase==5 then return R_POS_FINAL end
+    end
+    return nil
+end
+
+local function updateAutoPlayButtonVisuals()
+    if autoPlayLeftBtn then
+        local on=SETTINGS.AUTOLEFT
+        autoPlayLeftBtn.BackgroundColor3=on and PURPLE2 or BTN_DARK
+        autoPlayLeftBtn.TextColor3=on and TEXT_ON or TEXT_OFF
+        if autoPlayLeftStroke then autoPlayLeftStroke.Color=on and STROKE_ON or STROKE_OFF end
+    end
+    if autoPlayRightBtn then
+        local on=SETTINGS.AUTORIGHT
+        autoPlayRightBtn.BackgroundColor3=on and PURPLE2 or BTN_DARK
+        autoPlayRightBtn.TextColor3=on and TEXT_ON or TEXT_OFF
+        if autoPlayRightStroke then autoPlayRightStroke.Color=on and STROKE_ON or STROKE_OFF end
+    end
+end
+
+local function setAutoLeftState(on)
+    SETTINGS.AUTOLEFT=on==true
+    if SETTINGS.AUTOLEFT then SETTINGS.AUTORIGHT=false end
+    updateAutoPlayButtonVisuals()
+end
+
+local function setAutoRightState(on)
+    SETTINGS.AUTORIGHT=on==true
+    if SETTINGS.AUTORIGHT then SETTINGS.AUTOLEFT=false end
+    updateAutoPlayButtonVisuals()
+end
+
+local function resetAutoPlayState()
+    SETTINGS.AUTOLEFT=false; SETTINGS.AUTORIGHT=false
+    LeftPhase, RightPhase = 1, 1
+    LeftStartPos, RightStartPos = nil, nil
+    updateAutoPlayButtonVisuals()
+end
+
+local function stopAutoPlayHeartbeat()
+    if autoPlayHeartbeatConn then autoPlayHeartbeatConn:Disconnect(); autoPlayHeartbeatConn=nil end
+end
+
+local function startAutoPlayHeartbeat()
+    if autoPlayHeartbeatConn then return end
+    autoPlayHeartbeatConn=RunService.Heartbeat:Connect(function()
+        if not (SETTINGS.AUTOLEFT or SETTINGS.AUTORIGHT) then return end
+        if SETTINGS.AUTOLEFT and SETTINGS.AUTORIGHT then
+            SETTINGS.AUTORIGHT=false
+            setAutoRightState(false)
+        end
+
         local char=player.Character; if not char then return end
-        local hm=char:FindFirstChild("Humanoid"); local root=char:FindFirstChild("HumanoidRootPart"); if not(hm and root) then return end
-        while walkRunning do
-            local dir=Vector3.new((pt-root.Position).X,0,(pt-root.Position).Z); if dir.Magnitude<2 then break end
-            hm:Move(dir.Unit,false); RunService.RenderStepped:Wait()
-        end; if hm then hm:Move(Vector3.zero,false) end
-    end
-    local function startAW()
-        local char=player.Character; if not char then return end
-        local hm=char:FindFirstChild("Humanoid"); if not hm then return end
-        walkRunning=true; button.Text="🏃  WALKING"; tw(button,0.3,{BackgroundColor3=PURPLE2}); tw(bs,0.3,{Color=STROKE_ON}); button.TextColor3=TEXT_ON
-        blockMove(); forceSpeed(hm)
-        local route=getClosestRoute()
-        if not route then walkRunning=false; stopSpeed(hm); unblockMove(); button.Text="🚶  AUTO WALK"; tw(button,0.3,{BackgroundColor3=BTN_DARK}); tw(bs,0.3,{Color=STROKE_OFF}); button.TextColor3=TEXT_OFF; return end
-        task.spawn(function()
-            for _,pt in ipairs(route.Route) do if not walkRunning then break end; moveToPoint(pt) end
-            walkRunning=false; stopSpeed(hm); unblockMove()
-            button.Text="🚶  AUTO WALK"; tw(button,0.3,{BackgroundColor3=BTN_DARK}); tw(bs,0.3,{Color=STROKE_OFF}); button.TextColor3=TEXT_OFF
-        end)
-    end
-    local function stopAW()
-        walkRunning=false; local hm=player.Character and player.Character:FindFirstChild("Humanoid"); stopSpeed(hm); unblockMove()
-        if button and button.Parent then button.Text="🚶  AUTO WALK"; tw(button,0.3,{BackgroundColor3=BTN_DARK}); tw(bs,0.3,{Color=STROKE_OFF}); button.TextColor3=TEXT_OFF end
-    end
-    local oS=button.Size; local hS=UDim2.new(0,164,0,56); local cS=UDim2.new(0,154,0,48)
-    button.MouseEnter:Connect(function() tw(button,0.2,{Size=hS}); if not walkRunning then tw(bs,0.2,{Color=PURPLE}) end end)
-    button.MouseLeave:Connect(function() tw(button,0.2,{Size=oS}); if not walkRunning then tw(bs,0.2,{Color=STROKE_OFF}) end end)
-    button.MouseButton1Down:Connect(function()
-        tw(button,0.08,{Size=cS},Enum.EasingStyle.Back)
+        local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+
+        local activeSide = SETTINGS.AUTOLEFT and "Left" or (SETTINGS.AUTORIGHT and "Right" or nil)
+        if not activeSide then return end
+
+        local phase = (activeSide=="Left") and LeftPhase or RightPhase
+        local target = getCurrentAutoPlayTarget(activeSide, phase)
+        if not target then
+            if activeSide=="Left" then
+                SETTINGS.AUTOLEFT=false; setAutoLeftState(false); LeftPhase=1; LeftStartPos=nil
+            else
+                SETTINGS.AUTORIGHT=false; setAutoRightState(false); RightPhase=1; RightStartPos=nil
+            end
+            return
+        end
+
+        local normalSpeed, stealSpeed = getAutoPlaySpeeds()
+        local speed = (phase>=3) and stealSpeed or normalSpeed
+        local targetFlat = Vector3.new(target.X, hrp.Position.Y, target.Z)
+        local dist = (targetFlat - hrp.Position).Magnitude
+        if dist < 0.5 then
+            if activeSide=="Left" then
+                if LeftPhase < 5 then LeftPhase=LeftPhase+1
+                else SETTINGS.AUTOLEFT=false; setAutoLeftState(false); LeftPhase=1; LeftStartPos=nil end
+            else
+                if RightPhase < 5 then RightPhase=RightPhase+1
+                else SETTINGS.AUTORIGHT=false; setAutoRightState(false); RightPhase=1; RightStartPos=nil end
+            end
+            return
+        end
+
+        local delta = target - hrp.Position
+        local flatDelta = Vector3.new(delta.X,0,delta.Z)
+        if flatDelta.Magnitude<=0 then return end
+        local dir=delta.Unit
+        hrp.AssemblyLinearVelocity=Vector3.new(dir.X*speed,hrp.AssemblyLinearVelocity.Y,dir.Z*speed)
     end)
-    button.MouseButton1Up:Connect(function()
-        tw(button,0.1,{Size=hS},Enum.EasingStyle.Back)
+end
+
+local function createAutoPlayGui()
+    if autoPlayGui then return end
+    autoPlayGui=Instance.new("ScreenGui"); autoPlayGui.Name="UGC_AutoPlayGui"; autoPlayGui.ResetOnSpawn=false; autoPlayGui.IgnoreGuiInset=true; autoPlayGui.Parent=game:GetService("CoreGui")
+
+    local holder=Instance.new("Frame")
+    holder.Size=UDim2.new(0,160,0,52)
+    holder.BackgroundColor3=BTN_DARK; holder.BorderSizePixel=0; holder.Parent=autoPlayGui
+    holder.Active=true; holder.Selectable=false; holder.ZIndex=20
+    Instance.new("UICorner",holder).CornerRadius=UDim.new(0,13)
+    local holderStroke=Instance.new("UIStroke",holder); holderStroke.Color=STROKE_OFF; holderStroke.Thickness=1.5
+
+    local title=Instance.new("TextLabel")
+    title.Size=UDim2.new(1,0,0,14); title.Position=UDim2.new(0,0,0,2)
+    title.BackgroundTransparency=1; title.Text="AUTO PLAY"; title.Font=Enum.Font.GothamBlack; title.TextSize=9
+    title.TextColor3=TEXT_OFF; title.ZIndex=21; title.Parent=holder
+
+    local divider=Instance.new("Frame")
+    divider.Size=UDim2.new(0,2,1,-20); divider.Position=UDim2.new(0.5,-1,0,18)
+    divider.BorderSizePixel=0; divider.BackgroundColor3=PURPLE; divider.ZIndex=22; divider.Parent=holder
+
+    local function makeHalf(text, xPos)
+        local btn=Instance.new("TextButton")
+        btn.Size=UDim2.new(0.5,-1,1,-20); btn.Position=UDim2.new(xPos,0,0,18)
+        btn.BackgroundColor3=BTN_DARK; btn.Text=text; btn.Font=Enum.Font.GothamBlack; btn.TextSize=18
+        btn.TextColor3=TEXT_OFF; btn.AutoButtonColor=false; btn.Active=true; btn.Selectable=false; btn.ZIndex=21; btn.Parent=holder
+        local st=Instance.new("UIStroke",btn); st.Color=STROKE_OFF; st.Thickness=1.2
+        local cr=Instance.new("UICorner",btn); cr.CornerRadius=UDim.new(0,10)
+        return btn, st
+    end
+
+    autoPlayLeftBtn, autoPlayLeftStroke = makeHalf("L", 0)
+    autoPlayRightBtn, autoPlayRightStroke = makeHalf("R", 0.5)
+
+    local oS=holder.Size; local hS=UDim2.new(0,164,0,56); local cS=UDim2.new(0,154,0,48)
+    local function hover(on)
+        if on then tw(holder,0.2,{Size=hS}); tw(holderStroke,0.2,{Color=PURPLE})
+        else tw(holder,0.2,{Size=oS}); tw(holderStroke,0.2,{Color=STROKE_OFF}) end
+    end
+    holder.MouseEnter:Connect(function() hover(true) end)
+    holder.MouseLeave:Connect(function() hover(false) end)
+    holder.InputBegan:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then tw(holder,0.08,{Size=cS},Enum.EasingStyle.Back) end
     end)
-    button.MouseButton1Click:Connect(function()
-        if walkRunning then stopAW() else startAW() end
+    holder.InputEnded:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then tw(holder,0.1,{Size=hS},Enum.EasingStyle.Back) end
     end)
-    local rc=player.CharacterAdded:Connect(function() stopAW() end)
-    walkGui.AncestryChanged:Connect(function() if not walkGui.Parent then if rc then rc:Disconnect() end end end)
-    walkBtnRef = button
+
+    autoPlayLeftBtn.MouseButton1Click:Connect(function()
+        if shouldSuppressButtonClick(holder) then return end
+        local on=not SETTINGS.AUTOLEFT
+        SETTINGS.AUTOLEFT=on
+        if on then SETTINGS.AUTORIGHT=false; RightPhase, RightStartPos = 1, nil end
+        LeftPhase=1; LeftStartPos=nil
+        setAutoLeftState(SETTINGS.AUTOLEFT)
+        updateAutoPlayButtonVisuals()
+    end)
+
+    autoPlayRightBtn.MouseButton1Click:Connect(function()
+        if shouldSuppressButtonClick(holder) then return end
+        local on=not SETTINGS.AUTORIGHT
+        SETTINGS.AUTORIGHT=on
+        if on then SETTINGS.AUTOLEFT=false; LeftPhase, LeftStartPos = 1, nil end
+        RightPhase=1; RightStartPos=nil
+        setAutoRightState(SETTINGS.AUTORIGHT)
+        updateAutoPlayButtonVisuals()
+    end)
+
+    if autoPlayRespawnConn then autoPlayRespawnConn:Disconnect(); autoPlayRespawnConn=nil end
+    autoPlayRespawnConn=player.CharacterAdded:Connect(function()
+        resetAutoPlayState()
+    end)
+
+    autoPlayGui.AncestryChanged:Connect(function()
+        if autoPlayGui and not autoPlayGui.Parent then
+            stopAutoPlayHeartbeat()
+            resetAutoPlayState()
+            if autoPlayRespawnConn then autoPlayRespawnConn:Disconnect(); autoPlayRespawnConn=nil end
+        end
+    end)
+
+    walkBtnRef = holder
     ensureRightActionButtonsLayoutHook()
     positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
@@ -919,12 +1071,19 @@ local function createAutoWalkGui()
             positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
+
+    updateAutoPlayButtonVisuals()
+    startAutoPlayHeartbeat()
 end
-local function destroyAutoWalkGui()
+
+local function destroyAutoPlayGui()
+    stopAutoPlayHeartbeat()
+    resetAutoPlayState()
+    if autoPlayRespawnConn then autoPlayRespawnConn:Disconnect(); autoPlayRespawnConn=nil end
+    autoPlayLeftBtn=nil; autoPlayRightBtn=nil; autoPlayLeftStroke=nil; autoPlayRightStroke=nil
     walkBtnRef=nil
-    walkRunning=false
-    if walkSpeedConn then walkSpeedConn:Disconnect(); walkSpeedConn=nil end
-    ContextActionService:UnbindAction("BlockMoveAW"); if walkGui then walkGui:Destroy(); walkGui=nil end
+    if autoPlayGui then autoPlayGui:Destroy(); autoPlayGui=nil end
+    positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
 end
 
 -- ─── CHARACTER SETUP ────────────────────────────────────
@@ -1029,7 +1188,7 @@ local function scMakeRow(label,posY,def)
     Instance.new("UIStroke",box).Color=STROKE_OFF
     return box
 end
-local speedBox=scMakeRow("Vitesse",92,53); local stealBox=scMakeRow("Vol Speed",124,29); local jumpBox=scMakeRow("Saut",156,60)
+speedBox=scMakeRow("Vitesse",92,53); stealBox=scMakeRow("Vol Speed",124,29); local jumpBox=scMakeRow("Saut",156,60)
 
 local function applyBI(box,mn,mx,def) box.FocusLost:Connect(function() local n=tonumber(box.Text:gsub("%D","")) or def; box.Text=tostring(math.clamp(n,mn,mx)) end) end
 applyBI(speedBox,15,200,53); applyBI(stealBox,15,200,29); applyBI(jumpBox,50,200,60)
@@ -1432,7 +1591,7 @@ AddToggle("Combat","Auto Steal Nearest",
     end,
     function() autoStealEnabled=false; resetBar(true); hideStealCircle() end)
 
-AddToggle("Combat","Auto Walk", function() autoWalkEnabled=true; createAutoWalkGui() end, function() autoWalkEnabled=false; destroyAutoWalkGui() end)
+AddToggle("Combat","Auto Play", function() autoPlayEnabled=true; createAutoPlayGui() end, function() autoPlayEnabled=false; destroyAutoPlayGui() end)
 AddToggle("Combat","Lock Target", function() createLockGui() end, function() destroyLockGui() end)
 AddToggle("Combat","Auto Medusa", function() AutoMedusaEnabled=true; InitMedusa() end, function() AutoMedusaEnabled=false end)
 AddToggle("Combat","Auto Bat",
