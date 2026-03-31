@@ -2157,10 +2157,30 @@ configPasteBox.BackgroundColor3=BTN_DARK; configPasteBox.Text=CONFIG_PASTE_PLACE
 configPasteBox.TextSize=11; configPasteBox.TextColor3=TEXT_ON; configPasteBox.TextWrapped=false; configPasteBox.ClearTextOnFocus=false
 configPasteBox.MultiLine=true; configPasteBox.TextXAlignment=Enum.TextXAlignment.Left; configPasteBox.TextYAlignment=Enum.TextYAlignment.Top
 configPasteBox.Parent=frames["Settings"]
+local function isConfigPastePlaceholder()
+    return configPasteBox and configPasteBox.Text == CONFIG_PASTE_PLACEHOLDER
+end
+
+configPasteBox.TextColor3 = Color3.fromRGB(140,140,140)
 Instance.new("UICorner",configPasteBox).CornerRadius=UDim.new(0,12)
 local configPasteStroke=Instance.new("UIStroke",configPasteBox); configPasteStroke.Color=STROKE_OFF; configPasteStroke.Thickness=1.5
-configPasteBox.Focused:Connect(function() tw(configPasteStroke,0.2,{Color=PURPLE}) end)
-configPasteBox.FocusLost:Connect(function() tw(configPasteStroke,0.2,{Color=STROKE_OFF}) end)
+configPasteBox.Focused:Connect(function()
+    tw(configPasteStroke,0.2,{Color=PURPLE})
+    if isConfigPastePlaceholder() then
+        configPasteBox.Text = ""
+        configPasteBox.TextColor3 = TEXT_ON
+    end
+end)
+
+configPasteBox.FocusLost:Connect(function()
+    tw(configPasteStroke,0.2,{Color=STROKE_OFF})
+    if configPasteBox.Text == "" then
+        configPasteBox.Text = CONFIG_PASTE_PLACEHOLDER
+        configPasteBox.TextColor3 = Color3.fromRGB(140,140,140)
+    else
+        configPasteBox.TextColor3 = TEXT_ON
+    end
+end)
 
 local saveCfgBtn=Instance.new("TextButton"); saveCfgBtn.Size=UDim2.new(1,0,0,46)
 saveCfgBtn.BackgroundColor3=BTN_DARK; saveCfgBtn.Text="Save Config"; saveCfgBtn.Font=Enum.Font.GothamBlack
