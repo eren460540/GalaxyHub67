@@ -68,20 +68,25 @@ local function getSafeInsets()
 end
 
 local spinBtnRef = nil
+local floatBtnRef = nil
 local lockBtnRef = nil
 local walkBtnRef = nil
 local viewportLayoutConn = nil
 
-local function positionRightSideActionButtons(spinBtn, lockBtn, walkBtn)
+local function positionRightSideActionButtons(spinBtn, floatBtn, lockBtn, walkBtn)
     spinBtn = spinBtn or spinBtnRef
+    floatBtn = floatBtn or floatBtnRef
     lockBtn = lockBtn or lockBtnRef
     walkBtn = walkBtn or walkBtnRef
-    if not (spinBtn or lockBtn or walkBtn) then return end
+    if not (spinBtn or floatBtn or lockBtn or walkBtn) then return end
 
     local viewport = getViewportSize()
     local topLeftInset, bottomRightInset = getSafeInsets()
     local rightX = viewport.X - bottomRightInset.X - 24
+    local gap = 8
     local spinHeight = (spinBtn and spinBtn.AbsoluteSize.Y > 0) and spinBtn.AbsoluteSize.Y or 52
+    local spinWidth = (spinBtn and spinBtn.AbsoluteSize.X > 0) and spinBtn.AbsoluteSize.X or 160
+    local floatWidth = (floatBtn and floatBtn.AbsoluteSize.X > 0) and floatBtn.AbsoluteSize.X or 160
     local lockHeight = (lockBtn and lockBtn.AbsoluteSize.Y > 0) and lockBtn.AbsoluteSize.Y or 52
     local spinTop = topLeftInset.Y + 15
     local lockTop = spinTop + spinHeight + 8
@@ -93,6 +98,14 @@ local function positionRightSideActionButtons(spinBtn, lockBtn, walkBtn)
     if spinBtn then
         spinBtn.AnchorPoint = Vector2.new(1, 0)
         spinBtn.Position = UDim2.fromOffset(rightX, spinTop)
+    end
+    if floatBtn then
+        floatBtn.AnchorPoint = Vector2.new(1, 0)
+        if spinBtn then
+            floatBtn.Position = UDim2.fromOffset(rightX - spinWidth - gap, spinTop)
+        else
+            floatBtn.Position = UDim2.fromOffset(rightX - floatWidth - gap, spinTop)
+        end
     end
     if lockBtn then
         lockBtn.AnchorPoint = Vector2.new(1, 0)
@@ -107,8 +120,8 @@ end
 local function ensureRightActionButtonsLayoutHook()
     if viewportLayoutConn then return end
     viewportLayoutConn = RunService.RenderStepped:Connect(function()
-        if not (spinBtnRef or lockBtnRef or walkBtnRef) then return end
-        positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
+        if not (spinBtnRef or floatBtnRef or lockBtnRef or walkBtnRef) then return end
+        positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
     end)
 end
 
@@ -753,10 +766,10 @@ function createLockGui()
     end)
     lockBtnRef = btn
     ensureRightActionButtonsLayoutHook()
-    positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if lockBtnRef and lockBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
 end
@@ -808,6 +821,138 @@ end
 
 -- ─── SPIN BODY ──────────────────────────────────────────
 local spinForce, spinGui, spinActive = nil,nil,false
+local floatGui, floatActive = nil,false
+local floatBodyPosition, floatHeartbeatConn, floatTargetY = nil,nil,nil
+local floatSavedJumpPower, floatSavedJumpHeight, floatSavedUseJumpPower = nil,nil,nil
+local floatRootRef = nil
+
+local function updateFloatButtonVisual(on)
+    if not floatBtnRef then return end
+    local bs = floatBtnRef:FindFirstChildOfClass("UIStroke")
+    if on then
+        floatBtnRef.Text = "☁  FLOAT"
+        tw(floatBtnRef,0.25,{BackgroundColor3=PURPLE2})
+        if bs then tw(bs,0.25,{Color=STROKE_ON}) end
+        floatBtnRef.TextColor3 = TEXT_ON
+    else
+        floatBtnRef.Text = "☁  FLOAT"
+        tw(floatBtnRef,0.25,{BackgroundColor3=BTN_DARK})
+        if bs then tw(bs,0.25,{Color=STROKE_OFF}) end
+        floatBtnRef.TextColor3 = TEXT_OFF
+    end
+end
+
+local function cleanupFloat(restoreJump)
+    if floatHeartbeatConn then floatHeartbeatConn:Disconnect(); floatHeartbeatConn=nil end
+    if floatBodyPosition then floatBodyPosition:Destroy(); floatBodyPosition=nil end
+    floatTargetY=nil
+    if restoreJump and floatRootRef and floatRootRef.Parent then
+        local humanoid = floatRootRef.Parent:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            if floatSavedUseJumpPower ~= nil then humanoid.UseJumpPower = floatSavedUseJumpPower end
+            if floatSavedJumpPower ~= nil then humanoid.JumpPower = floatSavedJumpPower end
+            if floatSavedJumpHeight ~= nil then humanoid.JumpHeight = floatSavedJumpHeight end
+        end
+    end
+    floatSavedJumpPower, floatSavedJumpHeight, floatSavedUseJumpPower = nil,nil,nil
+    floatRootRef=nil
+    floatActive=false
+    updateFloatButtonVisual(false)
+end
+
+local function startFloat()
+    local char = lp.Character; if not char then return false end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root then return false end
+    if floatBodyPosition then cleanupFloat(true) end
+
+    floatRootRef = root
+    floatSavedUseJumpPower = humanoid.UseJumpPower
+    floatSavedJumpPower = humanoid.JumpPower
+    floatSavedJumpHeight = humanoid.JumpHeight
+    humanoid.JumpPower = 0
+    humanoid.JumpHeight = 0
+
+    floatTargetY = root.Position.Y + 10
+    floatBodyPosition = Instance.new("BodyPosition")
+    floatBodyPosition.Name = "UGC_FloatPosition"
+    floatBodyPosition.MaxForce = Vector3.new(0, math.huge, 0)
+    floatBodyPosition.P = 8000
+    floatBodyPosition.D = 800
+    floatBodyPosition.Position = Vector3.new(root.Position.X, floatTargetY, root.Position.Z)
+    floatBodyPosition.Parent = root
+
+    floatHeartbeatConn = RunService.Heartbeat:Connect(function()
+        if not floatActive then return end
+        if not (root and root.Parent and humanoid and humanoid.Parent) then
+            cleanupFloat(true)
+            return
+        end
+        humanoid.Jump = false
+        floatBodyPosition.Position = Vector3.new(root.Position.X, floatTargetY, root.Position.Z)
+    end)
+    return true
+end
+
+local function stopFloat()
+    if not floatRootRef or not floatBodyPosition then
+        cleanupFloat(true)
+        return
+    end
+    floatTargetY = floatTargetY and (floatTargetY - 10) or (floatRootRef.Position.Y - 10)
+    local root = floatRootRef
+    floatBodyPosition.Position = Vector3.new(root.Position.X, floatTargetY, root.Position.Z)
+    task.delay(0.22, function()
+        cleanupFloat(true)
+    end)
+end
+
+local function createFloatButton()
+    if floatGui then return end
+    floatGui=Instance.new("ScreenGui"); floatGui.Name="UGC_FloatGui"; floatGui.IgnoreGuiInset=true; floatGui.Parent=game:GetService("CoreGui")
+    local button=Instance.new("TextButton")
+    button.Size=UDim2.new(0,160,0,52)
+    button.BackgroundColor3=BTN_DARK; button.Text="☁  FLOAT"; button.Font=Enum.Font.GothamBlack
+    button.TextSize=14; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=floatGui
+    Instance.new("UICorner",button).CornerRadius=UDim.new(0,13)
+    local bs=Instance.new("UIStroke",button); bs.Color=STROKE_OFF; bs.Thickness=1.5
+    button.Active=true
+    button.Selectable=false
+    button.ZIndex = 20
+    local oS=button.Size; local hS=UDim2.new(0,164,0,56); local cS=UDim2.new(0,154,0,48)
+    button.MouseEnter:Connect(function() tw(button,0.2,{Size=hS}); if not floatActive then tw(bs,0.2,{Color=PURPLE}) end end)
+    button.MouseLeave:Connect(function() tw(button,0.2,{Size=oS}); if not floatActive then tw(bs,0.2,{Color=STROKE_OFF}) end end)
+    button.MouseButton1Down:Connect(function() tw(button,0.08,{Size=cS},Enum.EasingStyle.Back) end)
+    button.MouseButton1Up:Connect(function() tw(button,0.1,{Size=hS},Enum.EasingStyle.Back) end)
+    button.MouseButton1Click:Connect(function()
+        if shouldSuppressButtonClick(button) then return end
+        floatActive = not floatActive
+        if floatActive then
+            if not startFloat() then floatActive=false end
+            updateFloatButtonVisual(floatActive)
+        else
+            updateFloatButtonVisual(false)
+            stopFloat()
+        end
+    end)
+    floatBtnRef = button
+    ensureRightActionButtonsLayoutHook()
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+    task.defer(function()
+        if floatBtnRef and floatBtnRef.Parent then
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+        end
+    end)
+end
+
+local function destroyFloatButton()
+    cleanupFloat(true)
+    floatBtnRef=nil
+    if floatGui then floatGui:Destroy(); floatGui=nil end
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+end
+
 local function startSpinBody()
     local char=lp.Character; if not char then return end
     local root=char:FindFirstChild("HumanoidRootPart"); if not root or spinForce then return end
@@ -841,10 +986,10 @@ local function createSpinButton()
     end)
     spinBtnRef = button
     ensureRightActionButtonsLayoutHook()
-    positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if spinBtnRef and spinBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
 end
@@ -853,7 +998,7 @@ local function removeSpinButton()
     spinActive=false
     spinBtnRef=nil
     if spinGui then spinGui:Destroy(); spinGui=nil end
-    positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
 end
 
 local speedBox, stealBox
@@ -1083,10 +1228,10 @@ local function createAutoPlayGui()
 
     walkBtnRef = holder
     ensureRightActionButtonsLayoutHook()
-    positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if walkBtnRef and walkBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
 
@@ -1101,7 +1246,7 @@ local function destroyAutoPlayGui()
     autoPlayLeftBtn=nil; autoPlayRightBtn=nil; autoPlayLeftStroke=nil; autoPlayRightStroke=nil
     walkBtnRef=nil
     if autoPlayGui then autoPlayGui:Destroy(); autoPlayGui=nil end
-    positionRightSideActionButtons(spinBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
 end
 
 -- ─── CHARACTER SETUP ────────────────────────────────────
@@ -1133,6 +1278,7 @@ local function createSelfOverheadTag(characterModel)
 end
 
 local function setupCharacter(char)
+    cleanupFloat(true)
     character=char; hrp=character:WaitForChild("HumanoidRootPart"); hum=character:WaitForChild("Humanoid")
     createSelfOverheadTag(char)
     if meleeEnabled then task.spawn(function() task.wait(0.3); createMeleeAimbot(char) end) end
@@ -1638,6 +1784,7 @@ AddToggle("Player","No Walk Animation",
     function() if savedAnimate then savedAnimate.Disabled=false; savedAnimate=nil end end)
 AddToggle("Player","Anti Ragdoll", function() toggleAntiRagdoll(true) end, function() toggleAntiRagdoll(false) end)
 AddToggle("Player","Spin Body", function() createSpinButton() end, function() removeSpinButton() end)
+AddToggle("Player","Float", function() createFloatButton() end, function() destroyFloatButton() end)
 AddToggle("Player","Slow Fall", function() slowFallEnabled=true end, function() slowFallEnabled=false end)
 AddToggle("Player","Infinite Jump", function() infiniteJumpEnabled=true end, function() infiniteJumpEnabled=false end)
 
