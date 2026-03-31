@@ -19,14 +19,11 @@ if not RunService:IsClient() then
     return
 end
 
-local lp     = Players.LocalPlayer
-if not lp then return end
-local playerGui = lp:FindFirstChild("PlayerGui") or lp:WaitForChild("PlayerGui", 10)
-if not playerGui then
-    warn("FAILED TO GET PlayerGui")
-    return
-end
-local player = lp
+local player = game.Players.LocalPlayer
+if not player then return end
+local playerGui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 10)
+if not playerGui then return end
+local lp = player
 
 -- ══════════════════════════════════════════
 -- COLORS (script 2 palette + slight purple)
@@ -84,14 +81,21 @@ local function positionRightSideActionButtons(spinBtn, floatBtn, dropBtn, lockBt
     walkBtn = walkBtn or walkBtnRef
     if not (spinBtn or floatBtn or dropBtn or lockBtn or walkBtn) then return end
 
+    if spinBtn and not spinBtn:IsA("GuiObject") then spinBtn = nil end
+    if floatBtn and not floatBtn:IsA("GuiObject") then floatBtn = nil end
+    if dropBtn and not dropBtn:IsA("GuiObject") then dropBtn = nil end
+    if lockBtn and not lockBtn:IsA("GuiObject") then lockBtn = nil end
+    if walkBtn and not walkBtn:IsA("GuiObject") then walkBtn = nil end
+    if not (spinBtn or floatBtn or dropBtn or lockBtn or walkBtn) then return end
+
     local viewport = getViewportSize()
     local topLeftInset, bottomRightInset = getSafeInsets()
     local rightX = viewport.X - bottomRightInset.X - 24
     local gap = 8
-    local spinHeight = (spinBtn and spinBtn.AbsoluteSize.Y > 0) and spinBtn.AbsoluteSize.Y or 52
-    local spinWidth = (spinBtn and spinBtn.AbsoluteSize.X > 0) and spinBtn.AbsoluteSize.X or 160
-    local floatWidth = (floatBtn and floatBtn.AbsoluteSize.X > 0) and floatBtn.AbsoluteSize.X or 160
-    local lockHeight = (lockBtn and lockBtn.AbsoluteSize.Y > 0) and lockBtn.AbsoluteSize.Y or 52
+    local spinHeight = 52
+    local spinWidth = 160
+    local floatWidth = 160
+    local lockHeight = 52
     local spinTop = topLeftInset.Y + 15
     local floatTop = spinTop
     local dropTop = floatTop + spinHeight + gap
@@ -754,41 +758,47 @@ end
 
 function createLockGui()
     if lockGui then return end
-    lockGui = Instance.new("ScreenGui"); lockGui.Name="UGC_LockTarget"; lockGui.IgnoreGuiInset=true; lockGui.Parent=lp.PlayerGui
-    local btn = Instance.new("TextButton")
-    btn.Size=UDim2.new(0,160,0,52)
-    btn.BackgroundColor3=BTN_DARK; btn.Text="LOCK ON"; btn.Font=Enum.Font.GothamBlack
-    btn.TextSize=14; btn.TextColor3=TEXT_OFF; btn.AutoButtonColor=false; btn.Parent=lockGui
-    Instance.new("UICorner",btn).CornerRadius=UDim.new(0,13)
-    local bs = Instance.new("UIStroke",btn); bs.Color=STROKE_OFF; bs.Thickness=1.5
-    btn.Active=true
-    btn.Selectable=false
-    btn.ZIndex = 20
-    local origS=btn.Size; local hoverS=UDim2.new(0,164,0,56); local clickS=UDim2.new(0,154,0,48)
-    btn.MouseEnter:Connect(function() tw(btn,0.2,{Size=hoverS}); if not lockEnabled then tw(bs,0.2,{Color=PURPLE}) end end)
-    btn.MouseLeave:Connect(function() tw(btn,0.2,{Size=origS}); if not lockEnabled then tw(bs,0.2,{Color=STROKE_OFF}) end end)
-    btn.MouseButton1Down:Connect(function()
-        tw(btn,0.08,{Size=clickS},Enum.EasingStyle.Back)
+    local success, err = pcall(function()
+        lockGui = Instance.new("ScreenGui"); lockGui.Name="UGC_LockTarget"; lockGui.ResetOnSpawn=false; lockGui.IgnoreGuiInset=true; lockGui.Parent=playerGui
+        local btn = Instance.new("TextButton")
+        btn.Size=UDim2.new(0,160,0,52)
+        btn.BackgroundColor3=BTN_DARK; btn.Text="LOCK ON"; btn.Font=Enum.Font.GothamBlack
+        btn.TextSize=14; btn.TextColor3=TEXT_OFF; btn.AutoButtonColor=false; btn.Parent=lockGui
+        Instance.new("UICorner",btn).CornerRadius=UDim.new(0,13)
+        local bs = Instance.new("UIStroke",btn); bs.Color=STROKE_OFF; bs.Thickness=1.5
+        btn.Active=true
+        btn.Selectable=false
+        btn.ZIndex = 20
+        local origS=btn.Size; local hoverS=UDim2.new(0,164,0,56); local clickS=UDim2.new(0,154,0,48)
+        btn.MouseEnter:Connect(function() tw(btn,0.2,{Size=hoverS}); if not lockEnabled then tw(bs,0.2,{Color=PURPLE}) end end)
+        btn.MouseLeave:Connect(function() tw(btn,0.2,{Size=origS}); if not lockEnabled then tw(bs,0.2,{Color=STROKE_OFF}) end end)
+        btn.MouseButton1Down:Connect(function()
+            tw(btn,0.08,{Size=clickS},Enum.EasingStyle.Back)
+        end)
+        btn.MouseButton1Up:Connect(function()
+            tw(btn,0.1,{Size=hoverS},Enum.EasingStyle.Back)
+        end)
+        btn.MouseButton1Click:Connect(function()
+            lockEnabled = not lockEnabled
+            if lockEnabled then
+                btn.Text="LOCKED"; tw(btn,0.3,{BackgroundColor3=PURPLE2}); tw(bs,0.3,{Color=STROKE_ON}); btn.TextColor3=TEXT_ON; startLock()
+            else
+                btn.Text="LOCK ON"; tw(btn,0.3,{BackgroundColor3=BTN_DARK}); tw(bs,0.3,{Color=STROKE_OFF}); btn.TextColor3=TEXT_OFF; stopLock()
+            end
+        end)
+        lockBtnRef = btn
+        ensureRightActionButtonsLayoutHook()
+        task.wait()
+        positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+        task.defer(function()
+            if lockBtnRef and lockBtnRef.Parent then
+                positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+            end
+        end)
     end)
-    btn.MouseButton1Up:Connect(function()
-        tw(btn,0.1,{Size=hoverS},Enum.EasingStyle.Back)
-    end)
-    btn.MouseButton1Click:Connect(function()
-        lockEnabled = not lockEnabled
-        if lockEnabled then
-            btn.Text="LOCKED"; tw(btn,0.3,{BackgroundColor3=PURPLE2}); tw(bs,0.3,{Color=STROKE_ON}); btn.TextColor3=TEXT_ON; startLock()
-        else
-            btn.Text="LOCK ON"; tw(btn,0.3,{BackgroundColor3=BTN_DARK}); tw(bs,0.3,{Color=STROKE_OFF}); btn.TextColor3=TEXT_OFF; stopLock()
-        end
-    end)
-    lockBtnRef = btn
-    ensureRightActionButtonsLayoutHook()
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
-    task.defer(function()
-        if lockBtnRef and lockBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
-        end
-    end)
+    if not success then
+        warn("UI ERROR:", err)
+    end
 end
 function destroyLockGui()
     lockBtnRef=nil
@@ -927,7 +937,8 @@ end
 
 local function createFloatButton()
     if floatGui then return end
-    floatGui=Instance.new("ScreenGui"); floatGui.Name="UGC_FloatGui"; floatGui.IgnoreGuiInset=true; floatGui.Parent=playerGui
+    local success, err = pcall(function()
+    floatGui=Instance.new("ScreenGui"); floatGui.Name="UGC_FloatGui"; floatGui.ResetOnSpawn=false; floatGui.IgnoreGuiInset=true; floatGui.Parent=playerGui
     local button=Instance.new("TextButton")
     button.Size=UDim2.new(0,160,0,52)
     button.BackgroundColor3=BTN_DARK; button.Text="FLOAT"; button.Font=Enum.Font.GothamBlack
@@ -955,12 +966,17 @@ local function createFloatButton()
     end)
     floatBtnRef = button
     ensureRightActionButtonsLayoutHook()
+    task.wait()
     positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if floatBtnRef and floatBtnRef.Parent then
             positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
+    end)
+    if not success then
+        warn("UI ERROR:", err)
+    end
 end
 
 local function destroyFloatButton()
@@ -972,7 +988,8 @@ end
 
 local function createDropButton()
     if dropGui then return end
-    dropGui=Instance.new("ScreenGui"); dropGui.Name="UGC_DropGui"; dropGui.IgnoreGuiInset=true; dropGui.Parent=playerGui
+    local success, err = pcall(function()
+    dropGui=Instance.new("ScreenGui"); dropGui.Name="UGC_DropGui"; dropGui.ResetOnSpawn=false; dropGui.IgnoreGuiInset=true; dropGui.Parent=playerGui
     local button=Instance.new("TextButton")
     button.Size=UDim2.new(0,160,0,52)
     button.BackgroundColor3=BTN_DARK; button.Text="DROP"; button.Font=Enum.Font.GothamBlack
@@ -1002,12 +1019,17 @@ local function createDropButton()
     end)
     dropBtnRef = button
     ensureRightActionButtonsLayoutHook()
+    task.wait()
     positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if dropBtnRef and dropBtnRef.Parent then
             positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
+    end)
+    if not success then
+        warn("UI ERROR:", err)
+    end
 end
 
 local function destroyDropButton()
@@ -1026,7 +1048,8 @@ end
 local function stopSpinBody() if spinForce then spinForce:Destroy(); spinForce=nil end end
 local function createSpinButton()
     if spinGui then return end
-    spinGui=Instance.new("ScreenGui"); spinGui.Name="UGC_SpinGui"; spinGui.IgnoreGuiInset=true; spinGui.Parent=game:GetService("CoreGui")
+    local success, err = pcall(function()
+    spinGui=Instance.new("ScreenGui"); spinGui.Name="UGC_SpinGui"; spinGui.ResetOnSpawn=false; spinGui.IgnoreGuiInset=true; spinGui.Parent=playerGui
     local button=Instance.new("TextButton")
     button.Size=UDim2.new(0,160,0,52)
     button.BackgroundColor3=BTN_DARK; button.Text="SPIN"; button.Font=Enum.Font.GothamBlack
@@ -1049,12 +1072,17 @@ local function createSpinButton()
     end)
     spinBtnRef = button
     ensureRightActionButtonsLayoutHook()
+    task.wait()
     positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if spinBtnRef and spinBtnRef.Parent then
             positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
+    end)
+    if not success then
+        warn("UI ERROR:", err)
+    end
 end
 local function removeSpinButton()
     stopSpinBody()
@@ -1211,7 +1239,8 @@ end
 
 local function createAutoPlayGui()
     if autoPlayGui then return end
-    autoPlayGui=Instance.new("ScreenGui"); autoPlayGui.Name="UGC_AutoPlayGui"; autoPlayGui.ResetOnSpawn=false; autoPlayGui.IgnoreGuiInset=true; autoPlayGui.Parent=game:GetService("CoreGui")
+    local success, err = pcall(function()
+    autoPlayGui=Instance.new("ScreenGui"); autoPlayGui.Name="UGC_AutoPlayGui"; autoPlayGui.ResetOnSpawn=false; autoPlayGui.IgnoreGuiInset=true; autoPlayGui.Parent=playerGui
 
     local holder=Instance.new("Frame")
     holder.Size=UDim2.new(0,160,0,52)
@@ -1291,6 +1320,7 @@ local function createAutoPlayGui()
 
     walkBtnRef = holder
     ensureRightActionButtonsLayoutHook()
+    task.wait()
     positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if walkBtnRef and walkBtnRef.Parent then
@@ -1300,6 +1330,10 @@ local function createAutoPlayGui()
 
     updateAutoPlayButtonVisuals()
     startAutoPlayHeartbeat()
+    end)
+    if not success then
+        warn("UI ERROR:", err)
+    end
 end
 
 local function destroyAutoPlayGui()
@@ -1366,7 +1400,10 @@ end
 -- ══════════════════════════════════════════
 -- SPEED CUSTOMIZER (sub-window, style script2)
 -- ══════════════════════════════════════════
-local scGui = Instance.new("ScreenGui"); scGui.Name="UGC_SpeedCustomizer"; scGui.ResetOnSpawn=false; scGui.Enabled=false; scGui.Parent=playerGui
+local scGui
+local infiniteJumpEnabled=false
+local scSuccess, scErr = pcall(function()
+scGui = Instance.new("ScreenGui"); scGui.Name="UGC_SpeedCustomizer"; scGui.ResetOnSpawn=false; scGui.Enabled=false; scGui.Parent=playerGui
 
 local scFrame = Instance.new("Frame"); scFrame.Name="MainFrame"
 scFrame.Size=UDim2.new(0,240,0,200); scFrame.AnchorPoint=Vector2.new(1,0.5)
@@ -1420,7 +1457,6 @@ speedBox=scMakeRow("Vitesse",92,53); stealBox=scMakeRow("Vol Speed",124,29); loc
 local function applyBI(box,mn,mx,def) box.FocusLost:Connect(function() local n=tonumber(box.Text:gsub("%D","")) or def; box.Text=tostring(math.clamp(n,mn,mx)) end) end
 applyBI(speedBox,15,200,53); applyBI(stealBox,15,200,29); applyBI(jumpBox,50,200,60)
 
-local infiniteJumpEnabled=false
 local sNoSteal,sSteal=52,28
 
 scBtn.MouseButton1Click:Connect(function()
@@ -1450,6 +1486,10 @@ UserInputService.JumpRequest:Connect(function()
     end
     if infiniteJumpEnabled then hrp.AssemblyLinearVelocity=Vector3.new(hrp.AssemblyLinearVelocity.X,50,hrp.AssemblyLinearVelocity.Z) end
 end)
+end)
+if not scSuccess then
+    warn("UI ERROR:", scErr)
+end
 
 -- ══════════════════════════════════════════
 -- SLOW FALL + AUTO STEAL
@@ -1818,8 +1858,10 @@ local function loadConfig()
         if data.toggles then
             for label, desired in pairs(data.toggles) do
                 local info = toggleHandlers[label]
-                toggleStates[label] = desired == true
-                if info and info.isOn() ~= desired then
+                if info then
+                    toggleStates[label] = desired == true
+                end
+                if info and info.isOn and info.isOn() ~= desired then
                     if desired then
                         info.setOn()
                         if info.onFn then info.onFn() end
@@ -1904,7 +1946,7 @@ AddToggle("Combat","Auto Bat",
 AddToggle("Combat","Anti Sentry", function() startAntiSentry() end, function() stopAntiSentry() end)
 
 -- PLAYER
-AddToggle("Player","Speed Customizer", function() scGui.Enabled=true end, function() scGui.Enabled=false end)
+AddToggle("Player","Speed Customizer", function() if scGui then scGui.Enabled=true end end, function() if scGui then scGui.Enabled=false end end)
 AddToggle("Player","No Walk Animation",
     function()
         local char=lp.Character; if not char then return end
@@ -1977,12 +2019,13 @@ task.delay(1, function()
 
         local test = Instance.new("ScreenGui")
         test.Name = "TEST_GUI"
+        test.ResetOnSpawn = false
         test.Parent = playerGui
 
         local btn = Instance.new("TextLabel")
         btn.Size = UDim2.new(0,200,0,50)
         btn.Position = UDim2.new(0.5,-100,0.5,-25)
-        btn.Text = "SCRIPT RUNNING"
+        btn.Text = "UI FAILED"
         btn.BackgroundColor3 = Color3.new(1,0,0)
         btn.TextColor3 = Color3.new(1,1,1)
         btn.Parent = test
