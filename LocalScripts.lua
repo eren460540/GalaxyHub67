@@ -1514,9 +1514,10 @@ RunService.Heartbeat:Connect(function()
 end)
 
 local autoStealEnabled=false; local grabRadius=50
-local stealCooldown = 0.2
-local HOLD_DURATION = 0.2
 local stealCircle=nil
+local isStealing=false
+local currentTween=nil
+local stealCircleConn=nil
 local function hideStealCircle() if stealCircle then stealCircle:Destroy(); stealCircle=nil end end
 local function updateStealCircle()
     if stealCircle and lp.Character then
@@ -1531,38 +1532,40 @@ local function createStealCircle(r)
         stealCircle.Shape=Enum.PartType.Cylinder; stealCircle.Size=Vector3.new(0.05,r*2,r*2); stealCircle.Parent=workspace
     else stealCircle.Size=Vector3.new(0.05,r*2,r*2) end
 end
-local function getPromptPart(prompt)
+local function getPromptPos(prompt)
     if not prompt then return nil end
-    local parent = prompt.Parent
-    if parent and parent:IsA("BasePart") then
-        return parent
-    end
+    local parent=prompt.Parent
+    if parent and parent:IsA("BasePart") then return parent.Position end
     if parent and parent:IsA("Attachment") then
-        local attached = parent.Parent
-        if attached and attached:IsA("BasePart") then
-            return attached
-        end
+        local attached=parent.Parent
+        if attached and attached:IsA("BasePart") then return attached.Position end
     end
-    local model = prompt:FindFirstAncestorWhichIsA("Model")
+    local model=prompt:FindFirstAncestorWhichIsA("Model")
     if model then
-        return model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+        local part=model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+        if part then return part.Position end
     end
-    return prompt:FindFirstAncestorWhichIsA("BasePart")
+    local part=prompt:FindFirstAncestorWhichIsA("BasePart")
+    return part and part.Position or nil
 end
 local function findNearestStealPrompt()
-    local char = lp.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local char=lp.Character
+    local root=char and char:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
-    local plots = workspace:FindFirstChild("Plots")
+    local plots=workspace:FindFirstChild("Plots")
     if not plots then return nil end
 
     local nearest,dist=nil,math.huge
     for _,desc in ipairs(plots:GetDescendants()) do
         if desc:IsA("ProximityPrompt") and desc.Enabled and desc.ActionText=="Steal" then
-            local part=getPromptPart(desc)
-            if part then local d=(part.Position-root.Position).Magnitude; if d<dist and d<=grabRadius then nearest=desc; dist=d end end
+            local pos=getPromptPos(desc)
+            if pos then
+                local d=(pos-root.Position).Magnitude
+                if d<dist and d<=grabRadius then nearest=desc; dist=d end
+            end
         end
-    end; return nearest
+    end
+    return nearest
 end
 
 local autoBatActive=false; local autoBatLoop=nil; local savedAnimate=nil
@@ -1582,7 +1585,53 @@ local pbFill=Instance.new("Frame"); pbFill.Size=UDim2.new(0,0,1,0); pbFill.Backg
 Instance.new("UICorner",pbFill).CornerRadius=UDim.new(1,0)
 local pbPct=Instance.new("TextLabel"); pbPct.Size=UDim2.new(1,0,1,0); pbPct.BackgroundTransparency=1
 pbPct.Font=Enum.Font.GothamBold; pbPct.TextSize=9; pbPct.TextColor3=TEXT_ON; pbPct.Text="0%"; pbPct.Parent=pbBg
-local function resetBar(hide) pbFill.Size=UDim2.new(0,0,1,0); pbPct.Text="0%"; if hide then pbBg.Visible=false end end
+local function resetBar(hide)
+    if currentTween then currentTween:Cancel(); currentTween=nil end
+    pbFill.Size=UDim2.new(0,0,1,0)
+    pbPct.Text="0%"
+    isStealing=false
+    if hide then pbBg.Visible=false end
+end
+
+local function startStealLoop(prompt)
+    if isStealing then return end
+    isStealing=true
+    task.spawn(function()
+        pbBg.Visible=true
+        pbFill.Size=UDim2.new(0,0,1,0)
+        pbPct.Text="0%"
+
+        currentTween=TweenService:Create(pbFill,TweenInfo.new(0.2,Enum.EasingStyle.Linear),{Size=UDim2.new(1,0,1,0)})
+        currentTween:Play()
+
+        local startedAt=tick()
+        while isStealing and autoStealEnabled and prompt and prompt.Parent and tick()-startedAt<0.2 do
+            local char=lp.Character
+            local root=char and char:FindFirstChild("HumanoidRootPart")
+            local pos=getPromptPos(prompt)
+            if not root or not pos or (root.Position-pos).Magnitude>grabRadius then
+                resetBar()
+                return
+            end
+            local alpha=math.clamp((tick()-startedAt)/0.2,0,1)
+            pbPct.Text=tostring(math.floor(alpha*100)).."%"
+            task.wait()
+        end
+
+        if not autoStealEnabled or not prompt or not prompt.Parent then resetBar(); return end
+
+        local char=lp.Character
+        local root=char and char:FindFirstChild("HumanoidRootPart")
+        local pos=getPromptPos(prompt)
+        if not root or not pos or (root.Position-pos).Magnitude>grabRadius then resetBar(); return end
+
+        pcall(function() fireproximityprompt(prompt) end)
+        task.wait(0.05)
+        pcall(function() fireproximityprompt(prompt) end)
+
+        resetBar()
+    end)
+end
 
 -- ── TOP BAR (LEFT SIDE, CLICKABLE) ──
 local GUI_WIDTH = 260
@@ -1937,40 +1986,27 @@ AddToggle("Combat","Melee Aimbot",
 AddToggle("Combat","Auto Steal Nearest",
     function()
         autoStealEnabled=true; createStealCircle(grabRadius); pbBg.Visible=true
-        local uc=RunService.RenderStepped:Connect(updateStealCircle)
+        if stealCircleConn then stealCircleConn:Disconnect() end
+        stealCircleConn=RunService.RenderStepped:Connect(updateStealCircle)
         task.spawn(function()
             while autoStealEnabled do
-                local char = lp.Character
-                if char then
-                    local root = char:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        local prompt = findNearestStealPrompt()
-                        if prompt then
-                            prompt.MaxActivationDistance = 9e9
-                            prompt.RequiresLineOfSight = false
-                            prompt.ClickablePrompt = true
-
-                            local success = pcall(function()
-                                fireproximityprompt(prompt, 9e9, HOLD_DURATION)
-                            end)
-
-                            if not success then
-                                pcall(function()
-                                    prompt:InputHoldBegin()
-                                    task.wait(HOLD_DURATION)
-                                    prompt:InputHoldEnd()
-                                end)
-                            end
-                        end
-                    end
+                local prompt=findNearestStealPrompt()
+                if prompt and not isStealing then
+                    startStealLoop(prompt)
+                elseif not prompt and not isStealing then
+                    resetBar()
                 end
-                resetBar()
                 task.wait()
             end
-            resetBar(true); hideStealCircle(); if uc then uc:Disconnect() end
+            resetBar(true); hideStealCircle(); if stealCircleConn then stealCircleConn:Disconnect(); stealCircleConn=nil end
         end)
     end,
-    function() autoStealEnabled=false; resetBar(true); hideStealCircle() end)
+    function()
+        autoStealEnabled=false
+        resetBar(true)
+        hideStealCircle()
+        if stealCircleConn then stealCircleConn:Disconnect(); stealCircleConn=nil end
+    end)
 
 AddToggle("Combat","Auto Play", function() autoPlayEnabled=true; createAutoPlayGui() end, function() autoPlayEnabled=false; destroyAutoPlayGui() end)
 AddToggle("Combat","Lock Target", function() createLockGui() end, function() destroyLockGui() end)
