@@ -1965,7 +1965,7 @@ AddToggle("Combat","Auto Steal Nearest",
                     end
                 end
                 resetBar()
-                task.wait(stealCooldown)
+                task.wait()
             end
             resetBar(true); hideStealCircle(); if uc then uc:Disconnect() end
         end)
