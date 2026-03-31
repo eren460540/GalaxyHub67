@@ -859,7 +859,10 @@ end
 local speedBox, stealBox
 
 -- ─── AUTO PLAY ──────────────────────────────────────────
-local SETTINGS={AUTOLEFT=false,AUTORIGHT=false,STEAL_SPEED=29.40}
+SETTINGS = SETTINGS or {}
+if SETTINGS.AUTOLEFT == nil then SETTINGS.AUTOLEFT = false end
+if SETTINGS.AUTORIGHT == nil then SETTINGS.AUTORIGHT = false end
+SETTINGS.STEAL_SPEED = tonumber(SETTINGS.STEAL_SPEED) or 29.40
 local autoPlayEnabled=false; local autoPlayGui=nil; local autoPlayHeartbeatConn=nil; local autoPlayRespawnConn=nil
 local autoPlayLeftBtn=nil; local autoPlayRightBtn=nil; local autoPlayLeftStroke=nil; local autoPlayRightStroke=nil
 local LeftPhase, RightPhase = 1, 1
@@ -878,16 +881,19 @@ local R_POS_FINAL  = Vector3.new(-488, -6, 102)
 local function getAutoPlaySpeeds()
     local normalSpeed = 59.9
     local stealSpeed = 29.9
-    if typeof(speedBox)=="Instance" then
+
+    if typeof(speedBox) == "Instance" and speedBox:IsA("TextBox") then
         local n=tonumber(speedBox.Text)
         if n and n>0 then normalSpeed=n end
     end
-    if typeof(stealBox)=="Instance" then
+
+    if typeof(stealBox) == "Instance" and stealBox:IsA("TextBox") then
         local s=tonumber(stealBox.Text)
         if s and s>0 then stealSpeed=s end
     elseif tonumber(SETTINGS.STEAL_SPEED) and SETTINGS.STEAL_SPEED>0 then
         stealSpeed=SETTINGS.STEAL_SPEED
     end
+
     return normalSpeed, stealSpeed
 end
 
@@ -990,7 +996,7 @@ local function startAutoPlayHeartbeat()
         local delta = target - hrp.Position
         local flatDelta = Vector3.new(delta.X,0,delta.Z)
         if flatDelta.Magnitude<=0 then return end
-        local dir=delta.Unit
+        local dir=flatDelta.Unit
         hrp.AssemblyLinearVelocity=Vector3.new(dir.X*speed,hrp.AssemblyLinearVelocity.Y,dir.Z*speed)
     end)
 end
