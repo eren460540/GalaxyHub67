@@ -92,10 +92,10 @@ local function positionRightSideActionButtons(spinBtn, floatBtn, dropBtn, lockBt
     local topLeftInset, bottomRightInset = getSafeInsets()
     local rightX = viewport.X - bottomRightInset.X - 24
     local gap = 8
-    local spinHeight = 37
-    local spinWidth = 114
-    local floatWidth = 114
-    local lockHeight = 37
+    local spinHeight = 41
+    local spinWidth = 125
+    local floatWidth = 125
+    local lockHeight = 41
     local spinTop = topLeftInset.Y + 15
     local floatTop = spinTop
     local dropTop = floatTop + spinHeight + gap
@@ -761,15 +761,15 @@ function createLockGui()
     local success, err = pcall(function()
         lockGui = Instance.new("ScreenGui"); lockGui.Name="UGC_LockTarget"; lockGui.ResetOnSpawn=false; lockGui.IgnoreGuiInset=true; lockGui.Parent=playerGui
         local btn = Instance.new("TextButton")
-        btn.Size=UDim2.new(0,114,0,37)
+        btn.Size=UDim2.new(0,125,0,41)
         btn.BackgroundColor3=BTN_DARK; btn.Text="LOCK ON"; btn.Font=Enum.Font.GothamBlack
-        btn.TextSize=15; btn.TextColor3=TEXT_OFF; btn.AutoButtonColor=false; btn.Parent=lockGui
+        btn.TextSize=16; btn.TextColor3=TEXT_OFF; btn.AutoButtonColor=false; btn.Parent=lockGui
         Instance.new("UICorner",btn).CornerRadius=UDim.new(0,13)
         local bs = Instance.new("UIStroke",btn); bs.Color=STROKE_OFF; bs.Thickness=1.5
         btn.Active=true
         btn.Selectable=false
         btn.ZIndex = 20
-        local origS=btn.Size; local hoverS=UDim2.new(0,118,0,41); local clickS=UDim2.new(0,108,0,33)
+        local origS=btn.Size; local hoverS=UDim2.new(0,129,0,45); local clickS=UDim2.new(0,119,0,37)
         btn.MouseEnter:Connect(function() tw(btn,0.2,{Size=hoverS}); if not lockEnabled then tw(bs,0.2,{Color=PURPLE}) end end)
         btn.MouseLeave:Connect(function() tw(btn,0.2,{Size=origS}); if not lockEnabled then tw(bs,0.2,{Color=STROKE_OFF}) end end)
         btn.MouseButton1Down:Connect(function()
@@ -940,15 +940,15 @@ local function createFloatButton()
     local success, err = pcall(function()
     floatGui=Instance.new("ScreenGui"); floatGui.Name="UGC_FloatGui"; floatGui.ResetOnSpawn=false; floatGui.IgnoreGuiInset=true; floatGui.Parent=playerGui
     local button=Instance.new("TextButton")
-    button.Size=UDim2.new(0,114,0,37)
+    button.Size=UDim2.new(0,125,0,41)
     button.BackgroundColor3=BTN_DARK; button.Text="FLOAT"; button.Font=Enum.Font.GothamBlack
-    button.TextSize=15; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=floatGui
+    button.TextSize=16; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=floatGui
     Instance.new("UICorner",button).CornerRadius=UDim.new(0,13)
     local bs=Instance.new("UIStroke",button); bs.Color=STROKE_OFF; bs.Thickness=1.5
     button.Active=true
     button.Selectable=false
     button.ZIndex = 20
-    local oS=button.Size; local hS=UDim2.new(0,118,0,41); local cS=UDim2.new(0,108,0,33)
+    local oS=button.Size; local hS=UDim2.new(0,129,0,45); local cS=UDim2.new(0,119,0,37)
     button.MouseEnter:Connect(function() tw(button,0.2,{Size=hS}); if not floatActive then tw(bs,0.2,{Color=PURPLE}) end end)
     button.MouseLeave:Connect(function() tw(button,0.2,{Size=oS}); if not floatActive then tw(bs,0.2,{Color=STROKE_OFF}) end end)
     button.MouseButton1Down:Connect(function() tw(button,0.08,{Size=cS},Enum.EasingStyle.Back) end)
@@ -991,15 +991,15 @@ local function createDropButton()
     local success, err = pcall(function()
     dropGui=Instance.new("ScreenGui"); dropGui.Name="UGC_DropGui"; dropGui.ResetOnSpawn=false; dropGui.IgnoreGuiInset=true; dropGui.Parent=playerGui
     local button=Instance.new("TextButton")
-    button.Size=UDim2.new(0,114,0,37)
+    button.Size=UDim2.new(0,125,0,41)
     button.BackgroundColor3=BTN_DARK; button.Text="DROP"; button.Font=Enum.Font.GothamBlack
-    button.TextSize=15; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=dropGui
+    button.TextSize=16; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=dropGui
     Instance.new("UICorner",button).CornerRadius=UDim.new(0,13)
     local bs=Instance.new("UIStroke",button); bs.Color=STROKE_OFF; bs.Thickness=1.5
     button.Active=true
     button.Selectable=false
     button.ZIndex = 20
-    local oS=button.Size; local hS=UDim2.new(0,118,0,41); local cS=UDim2.new(0,108,0,33)
+    local oS=button.Size; local hS=UDim2.new(0,129,0,45); local cS=UDim2.new(0,119,0,37)
     button.MouseEnter:Connect(function() tw(button,0.2,{Size=hS}); tw(bs,0.2,{Color=PURPLE}) end)
     button.MouseLeave:Connect(function() tw(button,0.2,{Size=oS}); tw(bs,0.2,{Color=STROKE_OFF}) end)
     button.MouseButton1Down:Connect(function() tw(button,0.08,{Size=cS},Enum.EasingStyle.Back) end)
@@ -1051,15 +1051,15 @@ local function createSpinButton()
     local success, err = pcall(function()
     spinGui=Instance.new("ScreenGui"); spinGui.Name="UGC_SpinGui"; spinGui.ResetOnSpawn=false; spinGui.IgnoreGuiInset=true; spinGui.Parent=playerGui
     local button=Instance.new("TextButton")
-    button.Size=UDim2.new(0,114,0,37)
+    button.Size=UDim2.new(0,125,0,41)
     button.BackgroundColor3=BTN_DARK; button.Text="SPIN"; button.Font=Enum.Font.GothamBlack
-    button.TextSize=15; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=spinGui
+    button.TextSize=16; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=spinGui
     Instance.new("UICorner",button).CornerRadius=UDim.new(0,13)
     local bs=Instance.new("UIStroke",button); bs.Color=STROKE_OFF; bs.Thickness=1.5
     button.Active=true
     button.Selectable=false
     button.ZIndex = 20
-    local oS=button.Size; local hS=UDim2.new(0,118,0,41); local cS=UDim2.new(0,108,0,33)
+    local oS=button.Size; local hS=UDim2.new(0,129,0,45); local cS=UDim2.new(0,119,0,37)
     button.MouseEnter:Connect(function() tw(button,0.2,{Size=hS}); if not spinActive then tw(bs,0.2,{Color=PURPLE}) end end)
     button.MouseLeave:Connect(function() tw(button,0.2,{Size=oS}); if not spinActive then tw(bs,0.2,{Color=STROKE_OFF}) end end)
     button.MouseButton1Down:Connect(function() tw(button,0.08,{Size=cS},Enum.EasingStyle.Back) end)
@@ -1243,25 +1243,25 @@ local function createAutoPlayGui()
     autoPlayGui=Instance.new("ScreenGui"); autoPlayGui.Name="UGC_AutoPlayGui"; autoPlayGui.ResetOnSpawn=false; autoPlayGui.IgnoreGuiInset=true; autoPlayGui.Parent=playerGui
 
     local holder=Instance.new("Frame")
-    holder.Size=UDim2.new(0,114,0,37)
+    holder.Size=UDim2.new(0,125,0,41)
     holder.BackgroundColor3=BTN_DARK; holder.BorderSizePixel=0; holder.Parent=autoPlayGui
     holder.Active=true; holder.Selectable=false; holder.ZIndex=20
     Instance.new("UICorner",holder).CornerRadius=UDim.new(0,13)
     local holderStroke=Instance.new("UIStroke",holder); holderStroke.Color=STROKE_OFF; holderStroke.Thickness=1.5
 
     local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,0,0,11); title.Position=UDim2.new(0,0,0,1)
-    title.BackgroundTransparency=1; title.Text="AUTO PLAY"; title.Font=Enum.Font.GothamBlack; title.TextSize=10
+    title.Size=UDim2.new(1,0,0,12); title.Position=UDim2.new(0,0,0,2)
+    title.BackgroundTransparency=1; title.Text="AUTO PLAY"; title.Font=Enum.Font.GothamBlack; title.TextSize=11
     title.TextColor3=TEXT_OFF; title.ZIndex=21; title.Parent=holder
 
     local divider=Instance.new("Frame")
-    divider.Size=UDim2.new(0,2,1,-16); divider.Position=UDim2.new(0.5,-1,0,12)
+    divider.Size=UDim2.new(0,2,1,-18); divider.Position=UDim2.new(0.5,-1,0,14)
     divider.BorderSizePixel=0; divider.BackgroundColor3=PURPLE; divider.ZIndex=22; divider.Parent=holder
 
     local function makeHalf(text, xPos)
         local btn=Instance.new("TextButton")
-        btn.Size=UDim2.new(0.5,-1,1,-14); btn.Position=UDim2.new(xPos,0,0,12)
-        btn.BackgroundColor3=BTN_DARK; btn.Text=text; btn.Font=Enum.Font.GothamBlack; btn.TextSize=15
+        btn.Size=UDim2.new(0.5,-1,1,-16); btn.Position=UDim2.new(xPos,0,0,14)
+        btn.BackgroundColor3=BTN_DARK; btn.Text=text; btn.Font=Enum.Font.GothamBlack; btn.TextSize=16
         btn.TextColor3=TEXT_OFF; btn.AutoButtonColor=false; btn.Active=true; btn.Selectable=false; btn.ZIndex=21; btn.Parent=holder
         local st=Instance.new("UIStroke",btn); st.Color=STROKE_OFF; st.Thickness=1.2
         local cr=Instance.new("UICorner",btn); cr.CornerRadius=UDim.new(0,10)
@@ -1271,7 +1271,7 @@ local function createAutoPlayGui()
     autoPlayLeftBtn, autoPlayLeftStroke = makeHalf("L", 0)
     autoPlayRightBtn, autoPlayRightStroke = makeHalf("R", 0.5)
 
-    local oS=holder.Size; local hS=UDim2.new(0,118,0,41); local cS=UDim2.new(0,108,0,33)
+    local oS=holder.Size; local hS=UDim2.new(0,129,0,45); local cS=UDim2.new(0,119,0,37)
     local function hover(on)
         if on then tw(holder,0.2,{Size=hS}); tw(holderStroke,0.2,{Color=PURPLE})
         else tw(holder,0.2,{Size=oS}); tw(holderStroke,0.2,{Color=STROKE_OFF}) end
