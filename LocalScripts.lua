@@ -118,7 +118,8 @@ local function positionRightSideActionButtons(spinBtn, floatBtn, dropBtn, lockBt
     if dropBtn then
         dropBtn.AnchorPoint = Vector2.new(1, 0)
         if floatBtn then
-            dropBtn.Position = UDim2.fromOffset(floatBtn.AbsolutePosition.X + floatBtn.AbsoluteSize.X, dropTop)
+            local baseX = rightX - spinWidth - gap
+            dropBtn.Position = UDim2.fromOffset(baseX, dropTop)
         else
             dropBtn.Position = UDim2.fromOffset(rightX - floatWidth - gap, dropTop)
         end
@@ -1784,11 +1785,16 @@ local function saveConfig()
             settingsCopy[k] = v
         end
     end
+    local toggleCopy = {}
+    for k, v in pairs(toggleStates) do
+        toggleCopy[k] = v
+    end
+
     savedConfig = {
         speed = speedBox and speedBox.Text,
         steal = stealBox and stealBox.Text,
         SETTINGS = settingsCopy,
-        toggles = toggleStates,
+        toggles = toggleCopy,
     }
     pcall(function()
         if setclipboard then
