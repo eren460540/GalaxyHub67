@@ -1100,7 +1100,7 @@ local function removeSpinButton()
     positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
 end
 
-local speedBox, stealBox
+local speedBox, stealBox, configPasteBox
 
 -- ─── AUTO PLAY ──────────────────────────────────────────
 SETTINGS = SETTINGS or {}
@@ -1903,6 +1903,7 @@ end
 local savedConfig = {}
 local toggleStates = {}
 local toggleHandlers = {}
+local CONFIG_PASTE_PLACEHOLDER = "Paste config JSON here, then click Load Config"
 
 local function refreshSettingsInputs()
     if settingsInputRefs["Steal Radius"] then
@@ -1954,22 +1955,37 @@ local function saveConfig()
             writefile("galaxy_config.json", encoded)
         end
     end)
+
+    if configPasteBox then
+        configPasteBox.Text = encoded
+    end
 end
 
 local function loadConfig()
     pcall(function()
         local raw
 
-        pcall(function()
-            if getclipboard then
-                raw = getclipboard()
-            end
-        end)
+        local manualText = nil
+        if configPasteBox then
+            manualText = configPasteBox.Text
+        end
+
+        if manualText and manualText ~= "" and manualText ~= CONFIG_PASTE_PLACEHOLDER then
+            raw = manualText
+        end
 
         if not raw or raw == "" then
             pcall(function()
                 if isfile and readfile and isfile("galaxy_config.json") then
                     raw = readfile("galaxy_config.json")
+                end
+            end)
+        end
+
+        if not raw or raw == "" then
+            pcall(function()
+                if getclipboard then
+                    raw = getclipboard()
                 end
             end)
         end
@@ -2135,6 +2151,17 @@ MakeNumInput(frames["Settings"],"Steal Radius",grabRadius,1,1000,function(v) gra
 MakeNumInput(frames["Settings"],"Lock Range",LOCK_RADIUS,5,500,function(v) LOCK_RADIUS=v end)
 MakeNumInput(frames["Settings"],"Medusa Radius",MEDUSA_RADIUS,1,200,function(v) MEDUSA_RADIUS=v; if medusaPart then medusaPart.Size=Vector3.new(0.05,v*2,v*2) end end)
 MakeNumInput(frames["Settings"],"Melee Range",MELEE_RANGE,1,50,function(v) MELEE_RANGE=v end)
+
+configPasteBox=Instance.new("TextBox"); configPasteBox.Size=UDim2.new(1,0,0,72)
+configPasteBox.BackgroundColor3=BTN_DARK; configPasteBox.Text=CONFIG_PASTE_PLACEHOLDER; configPasteBox.Font=Enum.Font.Gotham
+configPasteBox.TextSize=11; configPasteBox.TextColor3=TEXT_ON; configPasteBox.TextWrapped=false; configPasteBox.ClearTextOnFocus=false
+configPasteBox.MultiLine=true; configPasteBox.TextXAlignment=Enum.TextXAlignment.Left; configPasteBox.TextYAlignment=Enum.TextYAlignment.Top
+configPasteBox.Parent=frames["Settings"]
+Instance.new("UICorner",configPasteBox).CornerRadius=UDim.new(0,12)
+local configPasteStroke=Instance.new("UIStroke",configPasteBox); configPasteStroke.Color=STROKE_OFF; configPasteStroke.Thickness=1.5
+configPasteBox.Focused:Connect(function() tw(configPasteStroke,0.2,{Color=PURPLE}) end)
+configPasteBox.FocusLost:Connect(function() tw(configPasteStroke,0.2,{Color=STROKE_OFF}) end)
+
 local saveCfgBtn=Instance.new("TextButton"); saveCfgBtn.Size=UDim2.new(1,0,0,46)
 saveCfgBtn.BackgroundColor3=BTN_DARK; saveCfgBtn.Text="Save Config"; saveCfgBtn.Font=Enum.Font.GothamBlack
 saveCfgBtn.TextSize=13; saveCfgBtn.TextColor3=TEXT_OFF; saveCfgBtn.AutoButtonColor=false; saveCfgBtn.Parent=frames["Settings"]
