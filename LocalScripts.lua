@@ -12,6 +12,7 @@ local Lighting           = game:GetService("Lighting")
 local Stats              = game:GetService("Stats")
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService         = game:GetService("GuiService")
+local HttpService        = game:GetService("HttpService")
 
 if not RunService:IsClient() then
     warn("NOT RUNNING ON CLIENT - UI WILL NOT SHOW")
@@ -69,16 +70,19 @@ end
 
 local spinBtnRef = nil
 local floatBtnRef = nil
+local dropBtnRef = nil
 local lockBtnRef = nil
 local walkBtnRef = nil
 local viewportLayoutConn = nil
+local dropGui = nil
 
-local function positionRightSideActionButtons(spinBtn, floatBtn, lockBtn, walkBtn)
+local function positionRightSideActionButtons(spinBtn, floatBtn, dropBtn, lockBtn, walkBtn)
     spinBtn = spinBtn or spinBtnRef
     floatBtn = floatBtn or floatBtnRef
+    dropBtn = dropBtn or dropBtnRef
     lockBtn = lockBtn or lockBtnRef
     walkBtn = walkBtn or walkBtnRef
-    if not (spinBtn or floatBtn or lockBtn or walkBtn) then return end
+    if not (spinBtn or floatBtn or dropBtn or lockBtn or walkBtn) then return end
 
     local viewport = getViewportSize()
     local topLeftInset, bottomRightInset = getSafeInsets()
@@ -89,9 +93,13 @@ local function positionRightSideActionButtons(spinBtn, floatBtn, lockBtn, walkBt
     local floatWidth = (floatBtn and floatBtn.AbsoluteSize.X > 0) and floatBtn.AbsoluteSize.X or 160
     local lockHeight = (lockBtn and lockBtn.AbsoluteSize.Y > 0) and lockBtn.AbsoluteSize.Y or 52
     local spinTop = topLeftInset.Y + 15
+    local floatTop = spinTop
+    local dropTop = floatTop + spinHeight + gap
     local lockTop = spinTop + spinHeight + 8
     local walkTop = lockTop + lockHeight + 8
     spinTop = spinTop - spinHeight
+    floatTop = floatTop - spinHeight
+    dropTop = dropTop - spinHeight
     lockTop = lockTop - spinHeight
     walkTop = walkTop - spinHeight
 
@@ -102,9 +110,17 @@ local function positionRightSideActionButtons(spinBtn, floatBtn, lockBtn, walkBt
     if floatBtn then
         floatBtn.AnchorPoint = Vector2.new(1, 0)
         if spinBtn then
-            floatBtn.Position = UDim2.fromOffset(rightX - spinWidth - gap, spinTop)
+            floatBtn.Position = UDim2.fromOffset(rightX - spinWidth - gap, floatTop)
         else
-            floatBtn.Position = UDim2.fromOffset(rightX - floatWidth - gap, spinTop)
+            floatBtn.Position = UDim2.fromOffset(rightX - floatWidth - gap, floatTop)
+        end
+    end
+    if dropBtn then
+        dropBtn.AnchorPoint = Vector2.new(1, 0)
+        if floatBtn then
+            dropBtn.Position = UDim2.fromOffset(floatBtn.AbsolutePosition.X + floatBtn.AbsoluteSize.X, dropTop)
+        else
+            dropBtn.Position = UDim2.fromOffset(rightX - floatWidth - gap, dropTop)
         end
     end
     if lockBtn then
@@ -120,8 +136,8 @@ end
 local function ensureRightActionButtonsLayoutHook()
     if viewportLayoutConn then return end
     viewportLayoutConn = RunService.RenderStepped:Connect(function()
-        if not (spinBtnRef or floatBtnRef or lockBtnRef or walkBtnRef) then return end
-        positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+        if not (spinBtnRef or floatBtnRef or dropBtnRef or lockBtnRef or walkBtnRef) then return end
+        positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
     end)
 end
 
@@ -740,7 +756,7 @@ function createLockGui()
     lockGui = Instance.new("ScreenGui"); lockGui.Name="UGC_LockTarget"; lockGui.IgnoreGuiInset=true; lockGui.Parent=lp.PlayerGui
     local btn = Instance.new("TextButton")
     btn.Size=UDim2.new(0,160,0,52)
-    btn.BackgroundColor3=BTN_DARK; btn.Text="🔒  LOCK ON"; btn.Font=Enum.Font.GothamBlack
+    btn.BackgroundColor3=BTN_DARK; btn.Text="LOCK ON"; btn.Font=Enum.Font.GothamBlack
     btn.TextSize=14; btn.TextColor3=TEXT_OFF; btn.AutoButtonColor=false; btn.Parent=lockGui
     Instance.new("UICorner",btn).CornerRadius=UDim.new(0,13)
     local bs = Instance.new("UIStroke",btn); bs.Color=STROKE_OFF; bs.Thickness=1.5
@@ -759,17 +775,17 @@ function createLockGui()
     btn.MouseButton1Click:Connect(function()
         lockEnabled = not lockEnabled
         if lockEnabled then
-            btn.Text="🔓  LOCKED"; tw(btn,0.3,{BackgroundColor3=PURPLE2}); tw(bs,0.3,{Color=STROKE_ON}); btn.TextColor3=TEXT_ON; startLock()
+            btn.Text="LOCKED"; tw(btn,0.3,{BackgroundColor3=PURPLE2}); tw(bs,0.3,{Color=STROKE_ON}); btn.TextColor3=TEXT_ON; startLock()
         else
-            btn.Text="🔒  LOCK ON"; tw(btn,0.3,{BackgroundColor3=BTN_DARK}); tw(bs,0.3,{Color=STROKE_OFF}); btn.TextColor3=TEXT_OFF; stopLock()
+            btn.Text="LOCK ON"; tw(btn,0.3,{BackgroundColor3=BTN_DARK}); tw(bs,0.3,{Color=STROKE_OFF}); btn.TextColor3=TEXT_OFF; stopLock()
         end
     end)
     lockBtnRef = btn
     ensureRightActionButtonsLayoutHook()
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if lockBtnRef and lockBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
 end
@@ -830,12 +846,12 @@ local function updateFloatButtonVisual(on)
     if not floatBtnRef then return end
     local bs = floatBtnRef:FindFirstChildOfClass("UIStroke")
     if on then
-        floatBtnRef.Text = "☁  FLOAT"
+        floatBtnRef.Text = "FLOAT"
         tw(floatBtnRef,0.25,{BackgroundColor3=PURPLE2})
         if bs then tw(bs,0.25,{Color=STROKE_ON}) end
         floatBtnRef.TextColor3 = TEXT_ON
     else
-        floatBtnRef.Text = "☁  FLOAT"
+        floatBtnRef.Text = "FLOAT"
         tw(floatBtnRef,0.25,{BackgroundColor3=BTN_DARK})
         if bs then tw(bs,0.25,{Color=STROKE_OFF}) end
         floatBtnRef.TextColor3 = TEXT_OFF
@@ -913,7 +929,7 @@ local function createFloatButton()
     floatGui=Instance.new("ScreenGui"); floatGui.Name="UGC_FloatGui"; floatGui.IgnoreGuiInset=true; floatGui.Parent=playerGui
     local button=Instance.new("TextButton")
     button.Size=UDim2.new(0,160,0,52)
-    button.BackgroundColor3=BTN_DARK; button.Text="☁  FLOAT"; button.Font=Enum.Font.GothamBlack
+    button.BackgroundColor3=BTN_DARK; button.Text="FLOAT"; button.Font=Enum.Font.GothamBlack
     button.TextSize=14; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=floatGui
     Instance.new("UICorner",button).CornerRadius=UDim.new(0,13)
     local bs=Instance.new("UIStroke",button); bs.Color=STROKE_OFF; bs.Thickness=1.5
@@ -938,10 +954,10 @@ local function createFloatButton()
     end)
     floatBtnRef = button
     ensureRightActionButtonsLayoutHook()
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if floatBtnRef and floatBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
 end
@@ -950,7 +966,53 @@ local function destroyFloatButton()
     cleanupFloat(true)
     floatBtnRef=nil
     if floatGui then floatGui:Destroy(); floatGui=nil end
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+end
+
+local function createDropButton()
+    if dropGui then return end
+    dropGui=Instance.new("ScreenGui"); dropGui.Name="UGC_DropGui"; dropGui.IgnoreGuiInset=true; dropGui.Parent=playerGui
+    local button=Instance.new("TextButton")
+    button.Size=UDim2.new(0,160,0,52)
+    button.BackgroundColor3=BTN_DARK; button.Text="DROP"; button.Font=Enum.Font.GothamBlack
+    button.TextSize=14; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=dropGui
+    Instance.new("UICorner",button).CornerRadius=UDim.new(0,13)
+    local bs=Instance.new("UIStroke",button); bs.Color=STROKE_OFF; bs.Thickness=1.5
+    button.Active=true
+    button.Selectable=false
+    button.ZIndex = 20
+    local oS=button.Size; local hS=UDim2.new(0,164,0,56); local cS=UDim2.new(0,154,0,48)
+    button.MouseEnter:Connect(function() tw(button,0.2,{Size=hS}); tw(bs,0.2,{Color=PURPLE}) end)
+    button.MouseLeave:Connect(function() tw(button,0.2,{Size=oS}); tw(bs,0.2,{Color=STROKE_OFF}) end)
+    button.MouseButton1Down:Connect(function() tw(button,0.08,{Size=cS},Enum.EasingStyle.Back) end)
+    button.MouseButton1Up:Connect(function() tw(button,0.1,{Size=hS},Enum.EasingStyle.Back) end)
+    button.MouseButton1Click:Connect(function()
+        if shouldSuppressButtonClick(button) then return end
+        local char = lp.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.AssemblyLinearVelocity = Vector3.new(0,125,0)
+            task.delay(0.4, function()
+                if hrp and hrp.Parent then
+                    hrp.AssemblyLinearVelocity = Vector3.new(0,-600,0)
+                end
+            end)
+        end
+    end)
+    dropBtnRef = button
+    ensureRightActionButtonsLayoutHook()
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+    task.defer(function()
+        if dropBtnRef and dropBtnRef.Parent then
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+        end
+    end)
+end
+
+local function destroyDropButton()
+    dropBtnRef=nil
+    if dropGui then dropGui:Destroy(); dropGui=nil end
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
 end
 
 local function startSpinBody()
@@ -966,7 +1028,7 @@ local function createSpinButton()
     spinGui=Instance.new("ScreenGui"); spinGui.Name="UGC_SpinGui"; spinGui.IgnoreGuiInset=true; spinGui.Parent=game:GetService("CoreGui")
     local button=Instance.new("TextButton")
     button.Size=UDim2.new(0,160,0,52)
-    button.BackgroundColor3=BTN_DARK; button.Text="🔄  SPIN"; button.Font=Enum.Font.GothamBlack
+    button.BackgroundColor3=BTN_DARK; button.Text="SPIN"; button.Font=Enum.Font.GothamBlack
     button.TextSize=14; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=spinGui
     Instance.new("UICorner",button).CornerRadius=UDim.new(0,13)
     local bs=Instance.new("UIStroke",button); bs.Color=STROKE_OFF; bs.Thickness=1.5
@@ -981,15 +1043,15 @@ local function createSpinButton()
     button.MouseButton1Click:Connect(function()
         if shouldSuppressButtonClick(button) then return end
         spinActive=not spinActive
-        if spinActive then button.Text="💫  SPINNING"; tw(button,0.3,{BackgroundColor3=PURPLE2}); tw(bs,0.3,{Color=STROKE_ON}); button.TextColor3=TEXT_ON; startSpinBody()
-        else button.Text="🔄  SPIN"; tw(button,0.3,{BackgroundColor3=BTN_DARK}); tw(bs,0.3,{Color=STROKE_OFF}); button.TextColor3=TEXT_OFF; stopSpinBody() end
+        if spinActive then button.Text="SPINNING"; tw(button,0.3,{BackgroundColor3=PURPLE2}); tw(bs,0.3,{Color=STROKE_ON}); button.TextColor3=TEXT_ON; startSpinBody()
+        else button.Text="SPIN"; tw(button,0.3,{BackgroundColor3=BTN_DARK}); tw(bs,0.3,{Color=STROKE_OFF}); button.TextColor3=TEXT_OFF; stopSpinBody() end
     end)
     spinBtnRef = button
     ensureRightActionButtonsLayoutHook()
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if spinBtnRef and spinBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
 end
@@ -998,7 +1060,7 @@ local function removeSpinButton()
     spinActive=false
     spinBtnRef=nil
     if spinGui then spinGui:Destroy(); spinGui=nil end
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
 end
 
 local speedBox, stealBox
@@ -1228,10 +1290,10 @@ local function createAutoPlayGui()
 
     walkBtnRef = holder
     ensureRightActionButtonsLayoutHook()
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if walkBtnRef and walkBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
 
@@ -1246,7 +1308,7 @@ local function destroyAutoPlayGui()
     autoPlayLeftBtn=nil; autoPlayRightBtn=nil; autoPlayLeftStroke=nil; autoPlayRightStroke=nil
     walkBtnRef=nil
     if autoPlayGui then autoPlayGui:Destroy(); autoPlayGui=nil end
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
 end
 
 -- ─── CHARACTER SETUP ────────────────────────────────────
@@ -1711,14 +1773,77 @@ local function MakeNumInput(parent, label, default, minV, maxV, callback)
     end)
 end
 
+local savedConfig = {}
+local toggleStates = {}
+local toggleHandlers = {}
+
+local function saveConfig()
+    local settingsCopy = {}
+    if type(SETTINGS) == "table" then
+        for k, v in pairs(SETTINGS) do
+            settingsCopy[k] = v
+        end
+    end
+    savedConfig = {
+        speed = speedBox and speedBox.Text,
+        steal = stealBox and stealBox.Text,
+        SETTINGS = settingsCopy,
+        toggles = toggleStates,
+    }
+    pcall(function()
+        if setclipboard then
+            setclipboard(HttpService:JSONEncode(savedConfig))
+        end
+    end)
+end
+
+local function loadConfig()
+    pcall(function()
+        local raw = getclipboard and getclipboard()
+        if not raw or raw == "" then return end
+        local data = HttpService:JSONDecode(raw)
+        if data.speed and speedBox then speedBox.Text = tostring(data.speed) end
+        if data.steal and stealBox then stealBox.Text = tostring(data.steal) end
+        if data.SETTINGS then
+            for k, v in pairs(data.SETTINGS) do
+                SETTINGS[k] = v
+            end
+        end
+        if data.toggles then
+            for label, desired in pairs(data.toggles) do
+                local info = toggleHandlers[label]
+                toggleStates[label] = desired == true
+                if info and info.isOn() ~= desired then
+                    if desired then
+                        info.setOn()
+                        if info.onFn then info.onFn() end
+                    else
+                        info.setOff()
+                        if info.offFn then info.offFn() end
+                    end
+                end
+            end
+        end
+    end)
+end
+
 -- ══════════════════════════════════════════
 -- POPULATE TOGGLES
 -- ══════════════════════════════════════════
 local function AddToggle(section, label, onFn, offFn)
     local btn, setOn, setOff, isOn = MakeButton(frames[section], label)
+    toggleStates[label] = false
+    toggleHandlers[label] = { setOn = setOn, setOff = setOff, isOn = isOn, onFn = onFn, offFn = offFn }
     btn.MouseButton1Click:Connect(function()
-        if isOn() then setOff(); if offFn then offFn() end
-        else setOn(); if onFn then onFn() end end
+        if isOn() then
+            setOff()
+            toggleStates[label] = false
+            if offFn then offFn() end
+        else
+            setOn()
+            toggleStates[label] = true
+            if onFn then onFn() end
+        end
     end)
 end
 
@@ -1785,6 +1910,7 @@ AddToggle("Player","No Walk Animation",
 AddToggle("Player","Anti Ragdoll", function() toggleAntiRagdoll(true) end, function() toggleAntiRagdoll(false) end)
 AddToggle("Player","Spin Body", function() createSpinButton() end, function() removeSpinButton() end)
 AddToggle("Player","Float", function() createFloatButton() end, function() destroyFloatButton() end)
+AddToggle("Player","Drop", function() createDropButton() end, function() destroyDropButton() end)
 AddToggle("Player","Slow Fall", function() slowFallEnabled=true end, function() slowFallEnabled=false end)
 AddToggle("Player","Infinite Jump", function() infiniteJumpEnabled=true end, function() infiniteJumpEnabled=false end)
 
@@ -1800,6 +1926,29 @@ MakeNumInput(frames["Settings"],"Steal Radius",grabRadius,1,1000,function(v) gra
 MakeNumInput(frames["Settings"],"Lock Range",LOCK_RADIUS,5,500,function(v) LOCK_RADIUS=v end)
 MakeNumInput(frames["Settings"],"Medusa Radius",MEDUSA_RADIUS,1,200,function(v) MEDUSA_RADIUS=v; if medusaPart then medusaPart.Size=Vector3.new(0.05,v*2,v*2) end end)
 MakeNumInput(frames["Settings"],"Melee Range",MELEE_RANGE,1,50,function(v) MELEE_RANGE=v end)
+local saveCfgBtn=Instance.new("TextButton"); saveCfgBtn.Size=UDim2.new(1,0,0,46)
+saveCfgBtn.BackgroundColor3=BTN_DARK; saveCfgBtn.Text="Save Config"; saveCfgBtn.Font=Enum.Font.GothamBlack
+saveCfgBtn.TextSize=13; saveCfgBtn.TextColor3=TEXT_OFF; saveCfgBtn.AutoButtonColor=false; saveCfgBtn.Parent=frames["Settings"]
+Instance.new("UICorner",saveCfgBtn).CornerRadius=UDim.new(0,12)
+local saveCfgStroke=Instance.new("UIStroke",saveCfgBtn); saveCfgStroke.Color=STROKE_OFF; saveCfgStroke.Thickness=1.5
+local saveOS=saveCfgBtn.Size; local saveHS=UDim2.new(1,4,0,50); local saveCS=UDim2.new(1,-6,0,42)
+saveCfgBtn.MouseEnter:Connect(function() tw(saveCfgBtn,0.2,{Size=saveHS}); tw(saveCfgStroke,0.2,{Color=PURPLE}) end)
+saveCfgBtn.MouseLeave:Connect(function() tw(saveCfgBtn,0.2,{Size=saveOS}); tw(saveCfgStroke,0.2,{Color=STROKE_OFF}) end)
+saveCfgBtn.MouseButton1Down:Connect(function() TweenService:Create(saveCfgBtn,TweenInfo.new(0.08,Enum.EasingStyle.Back),{Size=saveCS}):Play() end)
+saveCfgBtn.MouseButton1Up:Connect(function() TweenService:Create(saveCfgBtn,TweenInfo.new(0.1,Enum.EasingStyle.Back),{Size=saveHS}):Play() end)
+saveCfgBtn.MouseButton1Click:Connect(function() saveConfig() end)
+
+local loadCfgBtn=Instance.new("TextButton"); loadCfgBtn.Size=UDim2.new(1,0,0,46)
+loadCfgBtn.BackgroundColor3=BTN_DARK; loadCfgBtn.Text="Load Config"; loadCfgBtn.Font=Enum.Font.GothamBlack
+loadCfgBtn.TextSize=13; loadCfgBtn.TextColor3=TEXT_OFF; loadCfgBtn.AutoButtonColor=false; loadCfgBtn.Parent=frames["Settings"]
+Instance.new("UICorner",loadCfgBtn).CornerRadius=UDim.new(0,12)
+local loadCfgStroke=Instance.new("UIStroke",loadCfgBtn); loadCfgStroke.Color=STROKE_OFF; loadCfgStroke.Thickness=1.5
+local loadOS=loadCfgBtn.Size; local loadHS=UDim2.new(1,4,0,50); local loadCS=UDim2.new(1,-6,0,42)
+loadCfgBtn.MouseEnter:Connect(function() tw(loadCfgBtn,0.2,{Size=loadHS}); tw(loadCfgStroke,0.2,{Color=PURPLE}) end)
+loadCfgBtn.MouseLeave:Connect(function() tw(loadCfgBtn,0.2,{Size=loadOS}); tw(loadCfgStroke,0.2,{Color=STROKE_OFF}) end)
+loadCfgBtn.MouseButton1Down:Connect(function() TweenService:Create(loadCfgBtn,TweenInfo.new(0.08,Enum.EasingStyle.Back),{Size=loadCS}):Play() end)
+loadCfgBtn.MouseButton1Up:Connect(function() TweenService:Create(loadCfgBtn,TweenInfo.new(0.1,Enum.EasingStyle.Back),{Size=loadHS}):Play() end)
+loadCfgBtn.MouseButton1Click:Connect(function() loadConfig() end)
 
 -- Discord row
 local dcRow=Instance.new("Frame"); dcRow.Size=UDim2.new(1,0,0,36); dcRow.BackgroundColor3=BTN_DARK; dcRow.Parent=frames["Settings"]
