@@ -903,14 +903,14 @@ local function stopFloat()
     floatTargetY = floatTargetY and (floatTargetY - 10) or (floatRootRef.Position.Y - 10)
     local root = floatRootRef
     floatBodyPosition.Position = Vector3.new(root.Position.X, floatTargetY, root.Position.Z)
-    task.delay(0.22, function()
+    task.delay(0.35, function()
         cleanupFloat(true)
     end)
 end
 
 local function createFloatButton()
     if floatGui then return end
-    floatGui=Instance.new("ScreenGui"); floatGui.Name="UGC_FloatGui"; floatGui.IgnoreGuiInset=true; floatGui.Parent=game:GetService("CoreGui")
+    floatGui=Instance.new("ScreenGui"); floatGui.Name="UGC_FloatGui"; floatGui.IgnoreGuiInset=true; floatGui.Parent=playerGui
     local button=Instance.new("TextButton")
     button.Size=UDim2.new(0,160,0,52)
     button.BackgroundColor3=BTN_DARK; button.Text="☁  FLOAT"; button.Font=Enum.Font.GothamBlack
