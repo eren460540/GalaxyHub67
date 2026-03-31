@@ -1908,6 +1908,7 @@ local function saveConfig()
             settingsCopy[k] = v
         end
     end
+
     local toggleCopy = {}
     for k, v in pairs(toggleStates) do
         toggleCopy[k] = v
@@ -1918,39 +1919,101 @@ local function saveConfig()
         steal = stealBox and stealBox.Text,
         SETTINGS = settingsCopy,
         toggles = toggleCopy,
+        grabRadius = grabRadius,
+        lockRadius = LOCK_RADIUS,
+        medusaRadius = MEDUSA_RADIUS,
+        meleeRange = MELEE_RANGE
     }
+
+    local encoded = HttpService:JSONEncode(savedConfig)
     pcall(function()
         if setclipboard then
-            setclipboard(HttpService:JSONEncode(savedConfig))
+            setclipboard(encoded)
+        end
+    end)
+    pcall(function()
+        if writefile then
+            writefile("galaxy_config.json", encoded)
         end
     end)
 end
 
 local function loadConfig()
     pcall(function()
-        local raw = getclipboard and getclipboard()
+        local raw
+
+        pcall(function()
+            if getclipboard then
+                raw = getclipboard()
+            end
+        end)
+
+        if not raw or raw == "" then
+            pcall(function()
+                if isfile and readfile and isfile("galaxy_config.json") then
+                    raw = readfile("galaxy_config.json")
+                end
+            end)
+        end
+
         if not raw or raw == "" then return end
-        local data = HttpService:JSONDecode(raw)
+
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(raw)
+        end)
+        if not ok or type(data) ~= "table" then return end
+
         if data.speed and speedBox then speedBox.Text = tostring(data.speed) end
         if data.steal and stealBox then stealBox.Text = tostring(data.steal) end
-        if data.SETTINGS then
+
+        if type(data.SETTINGS) == "table" then
             for k, v in pairs(data.SETTINGS) do
                 SETTINGS[k] = v
             end
         end
-        if data.toggles then
+
+        if data.grabRadius ~= nil then
+            local n = tonumber(data.grabRadius)
+            if n then grabRadius = n end
+        end
+        if data.lockRadius ~= nil then
+            local n = tonumber(data.lockRadius)
+            if n then LOCK_RADIUS = n end
+        end
+        if data.medusaRadius ~= nil then
+            local n = tonumber(data.medusaRadius)
+            if n then MEDUSA_RADIUS = n end
+        end
+        if data.meleeRange ~= nil then
+            local n = tonumber(data.meleeRange)
+            if n then MELEE_RANGE = n end
+        end
+
+        if stealCircle then
+            stealCircle.Size = Vector3.new(0.05, grabRadius * 2, grabRadius * 2)
+        end
+        if medusaPart then
+            medusaPart.Size = Vector3.new(0.05, MEDUSA_RADIUS * 2, MEDUSA_RADIUS * 2)
+        end
+
+        if applyUISettings then
+            pcall(applyUISettings)
+        end
+
+        if type(data.toggles) == "table" then
             for label, desired in pairs(data.toggles) do
                 local info = toggleHandlers[label]
                 if info then
-                    toggleStates[label] = desired == true
-                end
-                if info and info.isOn and info.isOn() ~= desired then
-                    if desired then
-                        info.setOn()
-                        if info.onFn then info.onFn() end
-                    else
-                        info.setOff()
-                        if info.offFn then info.offFn() end
+                    local target = desired == true
+                    toggleStates[label] = target
+                    if info.isOn and info.isOn() ~= target then
+                        if target then
+                            if info.setOn then info.setOn() end
+                            if info.onFn then pcall(info.onFn) end
+                        else
+                            if info.setOff then info.setOff() end
+                            if info.offFn then pcall(info.offFn) end
+                        end
                     end
                 end
             end
