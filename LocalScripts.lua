@@ -1515,7 +1515,7 @@ end)
 
 local autoStealEnabled=false; local grabRadius=50
 local stealCooldown = 0.2
-local HOLD_DURATION = 0.5
+local HOLD_DURATION = 0.2
 local stealCircle=nil
 local function hideStealCircle() if stealCircle then stealCircle:Destroy(); stealCircle=nil end end
 local function updateStealCircle()
