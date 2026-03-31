@@ -1877,6 +1877,8 @@ end
 -- ══════════════════════════════════════════
 -- NUMBER INPUT FACTORY
 -- ══════════════════════════════════════════
+local settingsInputRefs = {}
+
 local function MakeNumInput(parent, label, default, minV, maxV, callback)
     local row=Instance.new("Frame"); row.Size=UDim2.new(1,0,0,46)
     row.BackgroundColor3=BTN_DARK; row.Parent=parent
@@ -1888,6 +1890,7 @@ local function MakeNumInput(parent, label, default, minV, maxV, callback)
     local box=Instance.new("TextBox"); box.Size=UDim2.new(0,72,0,30); box.Position=UDim2.new(1,-82,0.5,-15)
     box.BackgroundColor3=Color3.fromRGB(16,16,16); box.TextColor3=TEXT_ON; box.Font=Enum.Font.GothamBold
     box.TextSize=13; box.Text=tostring(default); box.ClearTextOnFocus=false; box.Parent=row
+    settingsInputRefs[label] = box
     Instance.new("UICorner",box).CornerRadius=UDim.new(0,8)
     local bxs=Instance.new("UIStroke",box); bxs.Color=STROKE_OFF; bxs.Thickness=1
     box.Focused:Connect(function() tw(bxs,0.2,{Color=PURPLE}) end)
@@ -1900,6 +1903,21 @@ end
 local savedConfig = {}
 local toggleStates = {}
 local toggleHandlers = {}
+
+local function refreshSettingsInputs()
+    if settingsInputRefs["Steal Radius"] then
+        settingsInputRefs["Steal Radius"].Text = tostring(grabRadius)
+    end
+    if settingsInputRefs["Lock Range"] then
+        settingsInputRefs["Lock Range"].Text = tostring(LOCK_RADIUS)
+    end
+    if settingsInputRefs["Medusa Radius"] then
+        settingsInputRefs["Medusa Radius"].Text = tostring(MEDUSA_RADIUS)
+    end
+    if settingsInputRefs["Melee Range"] then
+        settingsInputRefs["Melee Range"].Text = tostring(MELEE_RANGE)
+    end
+end
 
 local function saveConfig()
     local settingsCopy = {}
@@ -1999,6 +2017,7 @@ local function loadConfig()
         if applyUISettings then
             pcall(applyUISettings)
         end
+        refreshSettingsInputs()
 
         if type(data.toggles) == "table" then
             for label, desired in pairs(data.toggles) do
