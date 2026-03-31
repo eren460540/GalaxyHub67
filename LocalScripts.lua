@@ -660,49 +660,57 @@ local function disableMeleeAimbot()
 end
 
 -- ─── ANTI RAGDOLL ───────────────────────────────────────
-local antiRagdollMode = nil; local ragdollConns = {}; local ccd = {}
-local function cacheCharData()
-    local char = player.Character; if not char then return false end
-    local hm = char:FindFirstChildOfClass("Humanoid"); local root = char:FindFirstChild("HumanoidRootPart")
-    if not hm or not root then return false end
-    ccd = {character=char,humanoid=hm,root=root,originalWalkSpeed=hm.WalkSpeed,originalJumpPower=hm.JumpPower}; return true
+local antiRagdollEnabled = false; local antiRagdollConn = nil
+
+local function startAntiRagdoll()
+    if antiRagdollConn then return end
+    antiRagdollConn = RunService.Heartbeat:Connect(function()
+        if not antiRagdollEnabled then return end
+        local char = player.Character; if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+
+        if hum then
+            local s = hum:GetState()
+            if s == Enum.HumanoidStateType.Physics
+            or s == Enum.HumanoidStateType.Ragdoll
+            or s == Enum.HumanoidStateType.FallingDown then
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+
+                local cam = workspace.CurrentCamera
+                if cam then cam.CameraSubject = hum end
+
+                pcall(function()
+                    local ps = player:FindFirstChild("PlayerScripts")
+                    local pm = ps and ps:FindFirstChild("PlayerModule")
+                    if pm then
+                        local controlModule = pm:FindFirstChild("ControlModule")
+                        if controlModule then require(controlModule):Enable() end
+                    end
+                end)
+
+                if root then
+                    pcall(function() root.AssemblyLinearVelocity = Vector3.zero end)
+                    pcall(function() root.AssemblyAngularVelocity = Vector3.zero end)
+                    pcall(function() root.Velocity = Vector3.zero end)
+                    pcall(function() root.RotVelocity = Vector3.zero end)
+                end
+            end
+        end
+
+        for _, obj in ipairs(char:GetDescendants()) do
+            if obj:IsA("Motor6D") and not obj.Enabled then obj.Enabled = true end
+        end
+    end)
 end
-local function discRagdoll()
-    for _, c in ipairs(ragdollConns) do if typeof(c)=="RBXScriptConnection" then pcall(function() c:Disconnect() end) end end; ragdollConns = {}
+
+local function stopAntiRagdoll()
+    if antiRagdollConn then antiRagdollConn:Disconnect(); antiRagdollConn = nil end
 end
-local function isRagdolled()
-    if not ccd.humanoid then return false end
-    local s = ccd.humanoid:GetState()
-    if s==Enum.HumanoidStateType.Physics or s==Enum.HumanoidStateType.Ragdoll or s==Enum.HumanoidStateType.FallingDown then return true end
-    local et = player:GetAttribute("RagdollEndTime")
-    if et and (et - workspace:GetServerTimeNow()) > 0 then return true end; return false
-end
-local function removeRagdollC()
-    if not ccd.character then return end
-    for _, d in ipairs(ccd.character:GetDescendants()) do
-        if d:IsA("BallSocketConstraint") or (d:IsA("Attachment") and d.Name:find("RagdollAttachment")) then
-            pcall(function() d:Destroy() end) end end
-end
-local function forceExitRagdoll()
-    if not ccd.humanoid or not ccd.root then return end
-    pcall(function() player:SetAttribute("RagdollEndTime", workspace:GetServerTimeNow()) end)
-    if ccd.humanoid.Health > 0 then ccd.humanoid:ChangeState(Enum.HumanoidStateType.Running) end
-    ccd.root.Anchored = false; ccd.root.AssemblyLinearVelocity = Vector3.zero; ccd.root.AssemblyAngularVelocity = Vector3.zero
-end
-local function antiRagdollLoop()
-    while antiRagdollMode do
-        task.wait()
-        if isRagdolled() then removeRagdollC(); forceExitRagdoll() end
-        local cam = workspace.CurrentCamera
-        if cam and ccd.humanoid and cam.CameraSubject ~= ccd.humanoid then cam.CameraSubject = ccd.humanoid end
-    end
-end
+
 function toggleAntiRagdoll(on)
-    if on then
-        discRagdoll(); if not cacheCharData() then return end; antiRagdollMode = "v1"
-        local cc = player.CharacterAdded:Connect(function() task.wait(0.5); if antiRagdollMode then cacheCharData() end end)
-        table.insert(ragdollConns, cc); task.spawn(antiRagdollLoop)
-    else antiRagdollMode = nil; discRagdoll(); ccd = {} end
+    antiRagdollEnabled = on == true
+    if antiRagdollEnabled then startAntiRagdoll() else stopAntiRagdoll() end
 end
 
 -- ─── LOCK TARGET ────────────────────────────────────────
