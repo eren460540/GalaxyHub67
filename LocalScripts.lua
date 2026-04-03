@@ -72,21 +72,28 @@ local lockBtnRef = nil
 local walkBtnRef = nil
 local viewportLayoutConn = nil
 local dropGui = nil
+local tpDownGui = nil
+local tpDownBtnRef = nil
+local tpDownEnabled = false
+local tpDownConn = nil
+local TP_DOWN_Y = -7.00
 
-local function positionRightSideActionButtons(spinBtn, floatBtn, dropBtn, lockBtn, walkBtn)
+local function positionRightSideActionButtons(spinBtn, floatBtn, dropBtn, tpDownBtn, lockBtn, walkBtn)
     spinBtn = spinBtn or spinBtnRef
     floatBtn = floatBtn or floatBtnRef
     dropBtn = dropBtn or dropBtnRef
+    tpDownBtn = tpDownBtn or tpDownBtnRef
     lockBtn = lockBtn or lockBtnRef
     walkBtn = walkBtn or walkBtnRef
-    if not (spinBtn or floatBtn or dropBtn or lockBtn or walkBtn) then return end
+    if not (spinBtn or floatBtn or dropBtn or tpDownBtn or lockBtn or walkBtn) then return end
 
     if spinBtn and not spinBtn:IsA("GuiObject") then spinBtn = nil end
     if floatBtn and not floatBtn:IsA("GuiObject") then floatBtn = nil end
     if dropBtn and not dropBtn:IsA("GuiObject") then dropBtn = nil end
+    if tpDownBtn and not tpDownBtn:IsA("GuiObject") then tpDownBtn = nil end
     if lockBtn and not lockBtn:IsA("GuiObject") then lockBtn = nil end
     if walkBtn and not walkBtn:IsA("GuiObject") then walkBtn = nil end
-    if not (spinBtn or floatBtn or dropBtn or lockBtn or walkBtn) then return end
+    if not (spinBtn or floatBtn or dropBtn or tpDownBtn or lockBtn or walkBtn) then return end
 
     local viewport = getViewportSize()
     local topLeftInset, bottomRightInset = getSafeInsets()
@@ -99,11 +106,13 @@ local function positionRightSideActionButtons(spinBtn, floatBtn, dropBtn, lockBt
     local spinTop = topLeftInset.Y + 15
     local floatTop = spinTop
     local dropTop = floatTop + spinHeight + gap
+    local tpDownTop = dropTop + spinHeight + gap
     local lockTop = spinTop + spinHeight + gap
     local walkTop = lockTop + lockHeight + gap
     spinTop = spinTop - spinHeight
     floatTop = floatTop - spinHeight
     dropTop = dropTop - spinHeight
+    tpDownTop = tpDownTop - spinHeight
     lockTop = lockTop - spinHeight
     walkTop = walkTop - spinHeight
 
@@ -128,6 +137,15 @@ local function positionRightSideActionButtons(spinBtn, floatBtn, dropBtn, lockBt
             dropBtn.Position = UDim2.fromOffset(rightX - floatWidth - gap, dropTop)
         end
     end
+    if tpDownBtn then
+        tpDownBtn.AnchorPoint = Vector2.new(1, 0)
+        if floatBtn then
+            local baseX = rightX - spinWidth - gap
+            tpDownBtn.Position = UDim2.fromOffset(baseX, tpDownTop)
+        else
+            tpDownBtn.Position = UDim2.fromOffset(rightX - floatWidth - gap, tpDownTop)
+        end
+    end
     if lockBtn then
         lockBtn.AnchorPoint = Vector2.new(1, 0)
         lockBtn.Position = UDim2.fromOffset(rightX, lockTop)
@@ -141,8 +159,8 @@ end
 local function ensureRightActionButtonsLayoutHook()
     if viewportLayoutConn then return end
     viewportLayoutConn = RunService.RenderStepped:Connect(function()
-        if not (spinBtnRef or floatBtnRef or dropBtnRef or lockBtnRef or walkBtnRef) then return end
-        positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+        if not (spinBtnRef or floatBtnRef or dropBtnRef or tpDownBtnRef or lockBtnRef or walkBtnRef) then return end
+        positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
     end)
 end
 
@@ -797,10 +815,10 @@ function createLockGui()
         lockBtnRef = btn
         ensureRightActionButtonsLayoutHook()
         task.wait()
-        positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+        positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
         task.defer(function()
             if lockBtnRef and lockBtnRef.Parent then
-                positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+                positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
             end
         end)
     end)
@@ -975,10 +993,10 @@ local function createFloatButton()
     floatBtnRef = button
     ensureRightActionButtonsLayoutHook()
     task.wait()
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if floatBtnRef and floatBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
     end)
@@ -991,7 +1009,7 @@ local function destroyFloatButton()
     cleanupFloat(true)
     floatBtnRef=nil
     if floatGui then floatGui:Destroy(); floatGui=nil end
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
 end
 
 local function createDropButton()
@@ -1028,10 +1046,10 @@ local function createDropButton()
     dropBtnRef = button
     ensureRightActionButtonsLayoutHook()
     task.wait()
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if dropBtnRef and dropBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
     end)
@@ -1043,7 +1061,107 @@ end
 local function destroyDropButton()
     dropBtnRef=nil
     if dropGui then dropGui:Destroy(); dropGui=nil end
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
+end
+
+local function updateTpDownButtonVisual(on)
+    if not tpDownBtnRef then return end
+    local bs = tpDownBtnRef:FindFirstChildOfClass("UIStroke")
+    if on then
+        tpDownBtnRef.Text = "TP DOWN"
+        tw(tpDownBtnRef,0.25,{BackgroundColor3=PURPLE2})
+        if bs then tw(bs,0.25,{Color=STROKE_ON}) end
+        tpDownBtnRef.TextColor3 = TEXT_ON
+    else
+        tpDownBtnRef.Text = "TP DOWN"
+        tw(tpDownBtnRef,0.25,{BackgroundColor3=BTN_DARK})
+        if bs then tw(bs,0.25,{Color=STROKE_OFF}) end
+        tpDownBtnRef.TextColor3 = TEXT_OFF
+    end
+end
+
+local function startTpDown()
+    if tpDownConn then return end
+    tpDownEnabled = true
+    tpDownConn = RunService.Heartbeat:Connect(function()
+        if not tpDownEnabled then return end
+        local char = lp.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        local pos = hrp.Position
+        if math.abs(pos.Y - TP_DOWN_Y) > 0.01 then
+            local rotationOnly = hrp.CFrame - hrp.Position
+            hrp.CFrame = CFrame.new(pos.X, TP_DOWN_Y, pos.Z) * rotationOnly
+        end
+    end)
+end
+
+local function stopTpDown()
+    tpDownEnabled = false
+    if tpDownConn then
+        tpDownConn:Disconnect()
+        tpDownConn = nil
+    end
+end
+
+local function createTpDownButton()
+    if tpDownGui then
+        updateTpDownButtonVisual(SETTINGS.TPDOWN == true)
+        if SETTINGS.TPDOWN == true then startTpDown() else stopTpDown() end
+        return
+    end
+
+    local success, err = pcall(function()
+        tpDownGui=Instance.new("ScreenGui"); tpDownGui.Name="UGC_TpDownGui"; tpDownGui.ResetOnSpawn=false; tpDownGui.IgnoreGuiInset=true; tpDownGui.Parent=playerGui
+        local button=Instance.new("TextButton")
+        button.Size=UDim2.new(0,125,0,41)
+        button.BackgroundColor3=BTN_DARK; button.Text="TP DOWN"; button.Font=Enum.Font.GothamBlack
+        button.TextSize=16; button.TextColor3=TEXT_OFF; button.AutoButtonColor=false; button.Parent=tpDownGui
+        Instance.new("UICorner",button).CornerRadius=UDim.new(0,13)
+        local bs=Instance.new("UIStroke",button); bs.Color=STROKE_OFF; bs.Thickness=1.5
+        button.Active=true
+        button.Selectable=false
+        button.ZIndex = 20
+        local oS=button.Size; local hS=UDim2.new(0,129,0,45); local cS=UDim2.new(0,119,0,37)
+        button.MouseEnter:Connect(function() tw(button,0.2,{Size=hS}); if not (SETTINGS.TPDOWN == true) then tw(bs,0.2,{Color=PURPLE}) end end)
+        button.MouseLeave:Connect(function() tw(button,0.2,{Size=oS}); if not (SETTINGS.TPDOWN == true) then tw(bs,0.2,{Color=STROKE_OFF}) end end)
+        button.MouseButton1Down:Connect(function() tw(button,0.08,{Size=cS},Enum.EasingStyle.Back) end)
+        button.MouseButton1Up:Connect(function() tw(button,0.1,{Size=hS},Enum.EasingStyle.Back) end)
+        button.MouseButton1Click:Connect(function()
+            if shouldSuppressButtonClick(button) then return end
+            SETTINGS.TPDOWN = not (SETTINGS.TPDOWN == true)
+            tpDownEnabled = SETTINGS.TPDOWN == true
+            if tpDownEnabled then startTpDown() else stopTpDown() end
+            updateTpDownButtonVisual(tpDownEnabled)
+        end)
+
+        tpDownBtnRef = button
+        ensureRightActionButtonsLayoutHook()
+        task.wait()
+        positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
+        task.defer(function()
+            if tpDownBtnRef and tpDownBtnRef.Parent then
+                positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
+            end
+        end)
+
+        tpDownEnabled = SETTINGS.TPDOWN == true
+        updateTpDownButtonVisual(tpDownEnabled)
+        if tpDownEnabled then startTpDown() else stopTpDown() end
+    end)
+    if not success then
+        warn("UI ERROR:", err)
+    end
+end
+
+local function destroyTpDownButton()
+    stopTpDown()
+    SETTINGS.TPDOWN = false
+    tpDownEnabled = false
+    tpDownBtnRef=nil
+    if tpDownGui then tpDownGui:Destroy(); tpDownGui=nil end
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
 end
 
 local function startSpinBody()
@@ -1081,10 +1199,10 @@ local function createSpinButton()
     spinBtnRef = button
     ensureRightActionButtonsLayoutHook()
     task.wait()
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if spinBtnRef and spinBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
     end)
@@ -1097,7 +1215,7 @@ local function removeSpinButton()
     spinActive=false
     spinBtnRef=nil
     if spinGui then spinGui:Destroy(); spinGui=nil end
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
 end
 
 local speedBox, stealBox, configPasteBox
@@ -1106,6 +1224,7 @@ local speedBox, stealBox, configPasteBox
 SETTINGS = SETTINGS or {}
 if SETTINGS.AUTOLEFT == nil then SETTINGS.AUTOLEFT = false end
 if SETTINGS.AUTORIGHT == nil then SETTINGS.AUTORIGHT = false end
+if SETTINGS.TPDOWN == nil then SETTINGS.TPDOWN = false end
 SETTINGS.STEAL_SPEED = tonumber(SETTINGS.STEAL_SPEED) or 29.40
 local autoPlayEnabled=false; local autoPlayGui=nil; local autoPlayHeartbeatConn=nil; local autoPlayRespawnConn=nil
 local autoPlayLeftBtn=nil; local autoPlayRightBtn=nil; local autoPlayLeftStroke=nil; local autoPlayRightStroke=nil
@@ -1329,10 +1448,10 @@ local function createAutoPlayGui()
     walkBtnRef = holder
     ensureRightActionButtonsLayoutHook()
     task.wait()
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
     task.defer(function()
         if walkBtnRef and walkBtnRef.Parent then
-            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+            positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
         end
     end)
 
@@ -1351,7 +1470,7 @@ local function destroyAutoPlayGui()
     autoPlayLeftBtn=nil; autoPlayRightBtn=nil; autoPlayLeftStroke=nil; autoPlayRightStroke=nil
     walkBtnRef=nil
     if autoPlayGui then autoPlayGui:Destroy(); autoPlayGui=nil end
-    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, lockBtnRef, walkBtnRef)
+    positionRightSideActionButtons(spinBtnRef, floatBtnRef, dropBtnRef, tpDownBtnRef, lockBtnRef, walkBtnRef)
 end
 
 -- ─── CHARACTER SETUP ────────────────────────────────────
@@ -2005,6 +2124,7 @@ local function loadConfig()
                 SETTINGS[k] = v
             end
         end
+        SETTINGS.TPDOWN = SETTINGS.TPDOWN == true
 
         if data.grabRadius ~= nil then
             local n = tonumber(data.grabRadius)
@@ -2034,6 +2154,14 @@ local function loadConfig()
             pcall(applyUISettings)
         end
         refreshSettingsInputs()
+
+        tpDownEnabled = SETTINGS.TPDOWN == true
+        if tpDownBtnRef then
+            updateTpDownButtonVisual(tpDownEnabled)
+            if tpDownEnabled then startTpDown() else stopTpDown() end
+        else
+            stopTpDown()
+        end
 
         if type(data.toggles) == "table" then
             for label, desired in pairs(data.toggles) do
@@ -2136,6 +2264,7 @@ AddToggle("Player","Anti Ragdoll", function() toggleAntiRagdoll(true) end, funct
 AddToggle("Player","Spin Body", function() createSpinButton() end, function() removeSpinButton() end)
 AddToggle("Player","Float", function() createFloatButton() end, function() destroyFloatButton() end)
 AddToggle("Player","Drop", function() createDropButton() end, function() destroyDropButton() end)
+AddToggle("Player","TP Down", function() createTpDownButton() end, function() destroyTpDownButton() end)
 AddToggle("Player","Slow Fall", function() slowFallEnabled=true end, function() slowFallEnabled=false end)
 AddToggle("Player","Infinite Jump", function() infiniteJumpEnabled=true end, function() infiniteJumpEnabled=false end)
 
