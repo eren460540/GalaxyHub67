@@ -1082,7 +1082,9 @@ end
 
 local function startTpDown()
     if tpDownConn then return end
+    SETTINGS.TPDOWN = true
     tpDownEnabled = true
+    updateTpDownButtonVisual(true)
     tpDownConn = RunService.Heartbeat:Connect(function()
         if not tpDownEnabled then return end
         local char = lp.Character
@@ -1090,7 +1092,14 @@ local function startTpDown()
         if not hrp then return end
 
         local pos = hrp.Position
-        if math.abs(pos.Y - TP_DOWN_Y) > 0.01 then
+        if math.abs(pos.Y - TP_DOWN_Y) <= 0.05 then
+            stopTpDown()
+            SETTINGS.TPDOWN = false
+            tpDownEnabled = false
+            updateTpDownButtonVisual(false)
+            return
+        end
+        if math.abs(pos.Y - TP_DOWN_Y) > 0.05 then
             local rot = hrp.CFrame.Rotation
             hrp.CFrame = CFrame.new(pos.X, TP_DOWN_Y, pos.Z) * rot
         end
@@ -1098,11 +1107,13 @@ local function startTpDown()
 end
 
 local function stopTpDown()
+    SETTINGS.TPDOWN = false
     tpDownEnabled = false
     if tpDownConn then
         tpDownConn:Disconnect()
         tpDownConn = nil
     end
+    updateTpDownButtonVisual(false)
 end
 
 local function createTpDownButton()
@@ -1130,10 +1141,21 @@ local function createTpDownButton()
         button.MouseButton1Up:Connect(function() tw(button,0.1,{Size=hS},Enum.EasingStyle.Back) end)
         button.MouseButton1Click:Connect(function()
             if shouldSuppressButtonClick(button) then return end
-            SETTINGS.TPDOWN = not (SETTINGS.TPDOWN == true)
-            tpDownEnabled = SETTINGS.TPDOWN == true
-            if tpDownEnabled then startTpDown() else stopTpDown() end
-            updateTpDownButtonVisual(tpDownEnabled)
+            local enableTpDown = not (tpDownEnabled == true)
+            if enableTpDown and (floatActive or floatBodyPosition or floatHeartbeatConn) then
+                floatActive = false
+                cleanupFloat(true)
+                updateFloatButtonVisual(false)
+            end
+
+            if enableTpDown then
+                SETTINGS.TPDOWN = true
+                tpDownEnabled = true
+                updateTpDownButtonVisual(true)
+                startTpDown()
+            else
+                stopTpDown()
+            end
         end)
 
         tpDownBtnRef = button
