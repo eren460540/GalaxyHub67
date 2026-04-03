@@ -1081,38 +1081,39 @@ local function updateTpDownButtonVisual(on)
 end
 
 local function startTpDown()
-    if tpDownConn then return end
+    if tpDownConn then
+        tpDownConn:Disconnect()
+        tpDownConn = nil
+    end
     SETTINGS.TPDOWN = true
     tpDownEnabled = true
     updateTpDownButtonVisual(true)
     tpDownConn = RunService.Heartbeat:Connect(function()
-        if not tpDownEnabled then return end
         local char = lp.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
 
         local pos = hrp.Position
-        if math.abs(pos.Y - TP_DOWN_Y) <= 0.05 then
-            stopTpDown()
-            SETTINGS.TPDOWN = false
-            tpDownEnabled = false
-            updateTpDownButtonVisual(false)
-            return
+        local rot = hrp.CFrame.Rotation
+        hrp.CFrame = CFrame.new(pos.X, TP_DOWN_Y, pos.Z) * rot
+
+        if tpDownConn then
+            tpDownConn:Disconnect()
+            tpDownConn = nil
         end
-        if math.abs(pos.Y - TP_DOWN_Y) > 0.05 then
-            local rot = hrp.CFrame.Rotation
-            hrp.CFrame = CFrame.new(pos.X, TP_DOWN_Y, pos.Z) * rot
-        end
+        SETTINGS.TPDOWN = false
+        tpDownEnabled = false
+        updateTpDownButtonVisual(false)
     end)
 end
 
 local function stopTpDown()
-    SETTINGS.TPDOWN = false
-    tpDownEnabled = false
     if tpDownConn then
         tpDownConn:Disconnect()
         tpDownConn = nil
     end
+    SETTINGS.TPDOWN = false
+    tpDownEnabled = false
     updateTpDownButtonVisual(false)
 end
 
@@ -1141,20 +1142,16 @@ local function createTpDownButton()
         button.MouseButton1Up:Connect(function() tw(button,0.1,{Size=hS},Enum.EasingStyle.Back) end)
         button.MouseButton1Click:Connect(function()
             if shouldSuppressButtonClick(button) then return end
-            local enableTpDown = not (tpDownEnabled == true)
-            if enableTpDown and (floatActive or floatBodyPosition or floatHeartbeatConn) then
+            if floatActive or floatBodyPosition or floatHeartbeatConn then
                 floatActive = false
                 cleanupFloat(true)
                 updateFloatButtonVisual(false)
             end
 
-            if enableTpDown then
-                SETTINGS.TPDOWN = true
-                tpDownEnabled = true
-                updateTpDownButtonVisual(true)
-                startTpDown()
-            else
+            if tpDownConn or tpDownEnabled or SETTINGS.TPDOWN == true then
                 stopTpDown()
+            else
+                startTpDown()
             end
         end)
 
