@@ -1091,8 +1091,8 @@ local function startTpDown()
 
         local pos = hrp.Position
         if math.abs(pos.Y - TP_DOWN_Y) > 0.01 then
-            local rotationOnly = hrp.CFrame - hrp.Position
-            hrp.CFrame = CFrame.new(pos.X, TP_DOWN_Y, pos.Z) * rotationOnly
+            local rot = hrp.CFrame.Rotation
+            hrp.CFrame = CFrame.new(pos.X, TP_DOWN_Y, pos.Z) * rot
         end
     end)
 end
@@ -2154,14 +2154,6 @@ local function loadConfig()
             pcall(applyUISettings)
         end
         refreshSettingsInputs()
-
-        tpDownEnabled = SETTINGS.TPDOWN == true
-        if tpDownBtnRef then
-            updateTpDownButtonVisual(tpDownEnabled)
-            if tpDownEnabled then startTpDown() else stopTpDown() end
-        else
-            stopTpDown()
-        end
 
         if type(data.toggles) == "table" then
             for label, desired in pairs(data.toggles) do
