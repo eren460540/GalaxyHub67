@@ -2345,7 +2345,16 @@ AddToggle("Combat","Auto Steal Nearest",
         if stealCircleConn then stealCircleConn:Disconnect(); stealCircleConn=nil end
     end)
 
-AddToggle("Combat","Auto Play", function() autoPlayEnabled=true; createAutoPlayGui() end, function() autoPlayEnabled=false; destroyAutoPlayGui() end)
+AddToggle("Combat","Auto Play",
+    function()
+        autoPlayEnabled = true
+        createAutoPlayGui()
+    end,
+    function()
+        autoPlayEnabled = false
+        destroyAutoPlayGui()
+    end
+)
 AddToggle("Combat","Lock Target", function() createLockGui() end, function() destroyLockGui() end)
 AddToggle("Combat","Auto Medusa", function() AutoMedusaEnabled=true; InitMedusa() end, function() AutoMedusaEnabled=false end)
 AddToggle("Combat","Auto Bat",
@@ -2455,6 +2464,9 @@ dcBtn.TextColor3=Color3.fromRGB(130,130,130); dcBtn.Parent=dcRow
 dcBtn.MouseButton1Click:Connect(function() pcall(function() setclipboard("https://discord.gg/F4eknseBRK") end); dcBtn.Text="✅  Copied!"; task.wait(1.5); dcBtn.Text="📋  https://discord.gg/F4eknseBRK" end)
 
 ShowSection("Combat")
+sg.Enabled = true
+showMenu()
+print("[GalaxyHub] UI initialization complete.")
 end)
 
 if not success then
@@ -2479,3 +2491,5 @@ task.delay(1, function()
         btn.Parent = test
     end
 end)
+
+print("[GalaxyHub] Script finished executing.")
