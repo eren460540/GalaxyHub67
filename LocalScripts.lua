@@ -13,6 +13,7 @@ local Stats              = game:GetService("Stats")
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService         = game:GetService("GuiService")
 local HttpService        = game:GetService("HttpService")
+local CoreGui            = game:GetService("CoreGui")
 
 if not RunService:IsClient() then
     warn("NOT RUNNING ON CLIENT - UI WILL NOT SHOW")
@@ -1836,7 +1837,13 @@ local autoBatActive=false; local autoBatLoop=nil; local savedAnimate=nil
 -- MAIN SCREEN GUI
 -- ══════════════════════════════════════════
 local success, err = pcall(function()
-local sg=Instance.new("ScreenGui"); sg.Name="UGC_Duels"; sg.ResetOnSpawn=false; sg.IgnoreGuiInset=true; sg.Parent=playerGui
+local sg=Instance.new("ScreenGui"); sg.Name="UGC_Duels"; sg.ResetOnSpawn=false; sg.IgnoreGuiInset=true
+pcall(function()
+    sg.Parent = CoreGui
+end)
+if sg.Parent ~= CoreGui then
+    sg.Parent = playerGui
+end
 print("MAIN UI CREATED")
 
 -- Progress bar
@@ -2300,14 +2307,22 @@ local function AddToggle(section, label, onFn, offFn)
     toggleStates[label] = false
     toggleHandlers[label] = { setOn = setOn, setOff = setOff, isOn = isOn, onFn = onFn, offFn = offFn }
     btn.MouseButton1Click:Connect(function()
-        if isOn() then
-            setOff()
-            toggleStates[label] = false
-            if offFn then offFn() end
-        else
+        local newState = not toggleStates[label]
+        toggleStates[label] = newState
+        if newState then
             setOn()
-            toggleStates[label] = true
-            if onFn then onFn() end
+            if onFn then pcall(onFn) end
+        else
+            setOff()
+            if offFn then pcall(offFn) end
+        end
+
+        if isOn() ~= newState then
+            if newState then
+                setOn()
+            else
+                setOff()
+            end
         end
     end)
 end
