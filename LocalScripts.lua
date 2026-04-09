@@ -1653,9 +1653,12 @@ end)
 
 local autoStealEnabled=false; local grabRadius=50
 local stealCircle=nil
-local isStealing=false
-local currentTween=nil
 local stealCircleConn=nil
+local animalCache = {}
+local promptCache = {}
+local stealCache = {}
+local isStealing = false
+local AnimalsData = {}
 local function hideStealCircle() if stealCircle then stealCircle:Destroy(); stealCircle=nil end end
 local function updateStealCircle()
     if stealCircle and lp.Character then
@@ -1670,41 +1673,162 @@ local function createStealCircle(r)
         stealCircle.Shape=Enum.PartType.Cylinder; stealCircle.Size=Vector3.new(0.05,r*2,r*2); stealCircle.Parent=workspace
     else stealCircle.Size=Vector3.new(0.05,r*2,r*2) end
 end
-local function getPromptPos(prompt)
-    if not prompt then return nil end
-    local parent=prompt.Parent
-    if parent and parent:IsA("BasePart") then return parent.Position end
-    if parent and parent:IsA("Attachment") then
-        local attached=parent.Parent
-        if attached and attached:IsA("BasePart") then return attached.Position end
-    end
-    local model=prompt:FindFirstAncestorWhichIsA("Model")
-    if model then
-        local part=model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
-        if part then return part.Position end
-    end
-    local part=prompt:FindFirstAncestorWhichIsA("BasePart")
-    return part and part.Position or nil
-end
-local function findNearestStealPrompt()
-    local char=lp.Character
-    local root=char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
-    local plots=workspace:FindFirstChild("Plots")
-    if not plots then return nil end
 
-    local nearest,dist=nil,math.huge
-    for _,desc in ipairs(plots:GetDescendants()) do
-        if desc:IsA("ProximityPrompt") and desc.Enabled and desc.ActionText=="Steal" then
-            local pos=getPromptPos(desc)
-            if pos then
-                local d=(pos-root.Position).Magnitude
-                if d<dist and d<=grabRadius then nearest=desc; dist=d end
+pcall(function()
+    local datas = game:GetService("ReplicatedStorage"):FindFirstChild("Datas")
+    if datas then
+        local animals = datas:FindFirstChild("Animals")
+        if animals then AnimalsData = require(animals) end
+    end
+end)
+
+local function stealHRP()
+    local c = lp.Character
+    if not c then return nil end
+    return c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("UpperTorso")
+end
+
+local function isMyBase(plotName)
+    local plot = workspace.Plots and workspace.Plots:FindFirstChild(plotName)
+    if not plot then return false end
+    local sign = plot:FindFirstChild("PlotSign")
+    if not sign then return false end
+    local yb = sign:FindFirstChild("YourBase")
+    return yb and yb:IsA("BillboardGui") and yb.Enabled == true
+end
+
+local function scanPlot(plot)
+    if not plot or not plot:IsA("Model") then return end
+    if isMyBase(plot.Name) then return end
+    local podiums = plot:FindFirstChild("AnimalPodiums")
+    if not podiums then return end
+    for _, pod in ipairs(podiums:GetChildren()) do
+        if pod:IsA("Model") and pod:FindFirstChild("Base") then
+            local name = "Unknown"
+            local spawn = pod.Base:FindFirstChild("Spawn")
+            if spawn then
+                for _, child in ipairs(spawn:GetChildren()) do
+                    if child:IsA("Model") and child.Name ~= "PromptAttachment" then
+                        name = child.Name
+                        local info = AnimalsData[name]
+                        if info and info.DisplayName then name = info.DisplayName end
+                        break
+                    end
+                end
+            end
+            table.insert(animalCache, {
+                name = name,
+                plot = plot.Name,
+                slot = pod.Name,
+                worldPosition = pod:GetPivot().Position,
+                uid = plot.Name .. "*" .. pod.Name,
+            })
+        end
+    end
+end
+
+local function findPrompt(ad)
+    if not ad then return nil end
+    local cp = promptCache[ad.uid]
+    if cp and cp.Parent then return cp end
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return nil end
+    local plot = plots:FindFirstChild(ad.plot)
+    if not plot then return nil end
+    local pods = plot:FindFirstChild("AnimalPodiums")
+    if not pods then return nil end
+    local pod = pods:FindFirstChild(ad.slot)
+    if not pod then return nil end
+    local base = pod:FindFirstChild("Base")
+    if not base then return nil end
+    local sp = base:FindFirstChild("Spawn")
+    if not sp then return nil end
+    local att = sp:FindFirstChild("PromptAttachment")
+    if not att then return nil end
+    for _, p in ipairs(att:GetChildren()) do
+        if p:IsA("ProximityPrompt") then
+            promptCache[ad.uid] = p
+            return p
+        end
+    end
+end
+
+local function buildCallbacks(prompt)
+    if stealCache[prompt] then return end
+    local data = { holdCallbacks = {}, triggerCallbacks = {}, ready = true }
+    local ok1, c1 = pcall(getconnections, prompt.PromptButtonHoldBegan)
+    if ok1 and type(c1) == "table" then
+        for _, conn in ipairs(c1) do
+            if type(conn.Function) == "function" then
+                table.insert(data.holdCallbacks, conn.Function)
             end
         end
     end
-    return nearest
+    local ok2, c2 = pcall(getconnections, prompt.Triggered)
+    if ok2 and type(c2) == "table" then
+        for _, conn in ipairs(c2) do
+            if type(conn.Function) == "function" then
+                table.insert(data.triggerCallbacks, conn.Function)
+            end
+        end
+    end
+    if #data.holdCallbacks > 0 or #data.triggerCallbacks > 0 then
+        stealCache[prompt] = data
+    end
 end
+
+local function execSteal(prompt)
+    local data = stealCache[prompt]
+    if not data or not data.ready then return false end
+    data.ready = false
+    isStealing = true
+    task.spawn(function()
+        for _, fn in ipairs(data.holdCallbacks) do task.spawn(fn) end
+        task.wait(0.2)
+        for _, fn in ipairs(data.triggerCallbacks) do task.spawn(fn) end
+        task.wait(0.01)
+        data.ready = true
+        task.wait(0.01)
+        isStealing = false
+    end)
+    return true
+end
+
+local function nearestAnimal()
+    local h = stealHRP()
+    if not h then return nil end
+    local best, bestD = nil, math.huge
+    for _, ad in ipairs(animalCache) do
+        if not isMyBase(ad.plot) and ad.worldPosition then
+            local d = (h.Position - ad.worldPosition).Magnitude
+            if d < bestD then
+                bestD = d
+                best = ad
+            end
+        end
+    end
+    return best
+end
+
+task.spawn(function()
+    task.wait(2)
+    local plots = workspace:WaitForChild("Plots", 10)
+    if not plots then return end
+    for _, plot in ipairs(plots:GetChildren()) do
+        if plot:IsA("Model") then scanPlot(plot) end
+    end
+    plots.ChildAdded:Connect(function(plot)
+        if plot:IsA("Model") then task.wait(0.5); scanPlot(plot) end
+    end)
+    task.spawn(function()
+        while task.wait(5) do
+            animalCache = {}
+            for _, plot in ipairs(plots:GetChildren()) do
+                if plot:IsA("Model") then scanPlot(plot) end
+            end
+        end
+    end)
+end)
 
 local autoBatActive=false; local autoBatLoop=nil; local savedAnimate=nil
 
@@ -1724,52 +1848,25 @@ Instance.new("UICorner",pbFill).CornerRadius=UDim.new(1,0)
 local pbPct=Instance.new("TextLabel"); pbPct.Size=UDim2.new(1,0,1,0); pbPct.BackgroundTransparency=1
 pbPct.Font=Enum.Font.GothamBold; pbPct.TextSize=9; pbPct.TextColor3=TEXT_ON; pbPct.Text="0%"; pbPct.Parent=pbBg
 local function resetBar(hide)
-    if currentTween then currentTween:Cancel(); currentTween=nil end
     pbFill.Size=UDim2.new(0,0,1,0)
     pbPct.Text="0%"
-    isStealing=false
     if hide then pbBg.Visible=false end
 end
 
-local function startStealLoop(prompt)
-    if isStealing then return end
-    isStealing=true
-    task.spawn(function()
-        pbBg.Visible=true
-        pbFill.Size=UDim2.new(0,0,1,0)
-        pbPct.Text="0%"
-
-        currentTween=TweenService:Create(pbFill,TweenInfo.new(0.2,Enum.EasingStyle.Linear),{Size=UDim2.new(1,0,1,0)})
-        currentTween:Play()
-
-        local startedAt=tick()
-        while isStealing and autoStealEnabled and prompt and prompt.Parent and tick()-startedAt<0.2 do
-            local char=lp.Character
-            local root=char and char:FindFirstChild("HumanoidRootPart")
-            local pos=getPromptPos(prompt)
-            if not root or not pos or (root.Position-pos).Magnitude>grabRadius then
-                resetBar()
-                return
-            end
-            local alpha=math.clamp((tick()-startedAt)/0.2,0,1)
-            pbPct.Text=tostring(math.floor(alpha*100)).."%"
-            task.wait()
-        end
-
-        if not autoStealEnabled or not prompt or not prompt.Parent then resetBar(); return end
-
-        local char=lp.Character
-        local root=char and char:FindFirstChild("HumanoidRootPart")
-        local pos=getPromptPos(prompt)
-        if not root or not pos or (root.Position-pos).Magnitude>grabRadius then resetBar(); return end
-
-        pcall(function() fireproximityprompt(prompt) end)
-        task.wait(0.05)
-        pcall(function() fireproximityprompt(prompt) end)
-
-        resetBar()
-    end)
-end
+RunService.Heartbeat:Connect(function()
+    if not autoStealEnabled or isStealing then return end
+    local target = nearestAnimal()
+    if not target then return end
+    local h = stealHRP()
+    if not h then return end
+    if (h.Position - target.worldPosition).Magnitude > grabRadius then return end
+    local prompt = promptCache[target.uid]
+    if not prompt or not prompt.Parent then prompt = findPrompt(target) end
+    if prompt then
+        buildCallbacks(prompt)
+        execSteal(prompt)
+    end
+end)
 
 -- ── TOP BAR (LEFT SIDE, CLICKABLE) ──
 local GUI_WIDTH = 260
@@ -2225,18 +2322,6 @@ AddToggle("Combat","Auto Steal Nearest",
         autoStealEnabled=true; createStealCircle(grabRadius); pbBg.Visible=true
         if stealCircleConn then stealCircleConn:Disconnect() end
         stealCircleConn=RunService.RenderStepped:Connect(updateStealCircle)
-        task.spawn(function()
-            while autoStealEnabled do
-                local prompt=findNearestStealPrompt()
-                if prompt and not isStealing then
-                    startStealLoop(prompt)
-                elseif not prompt and not isStealing then
-                    resetBar()
-                end
-                task.wait()
-            end
-            resetBar(true); hideStealCircle(); if stealCircleConn then stealCircleConn:Disconnect(); stealCircleConn=nil end
-        end)
     end,
     function()
         autoStealEnabled=false
