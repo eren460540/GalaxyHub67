@@ -1602,7 +1602,7 @@ local function createAutoPlayGui()
 
     updateAutoPlayButtonVisuals()
     startAutoPlayHeartbeat()
-    end)
+end)
     if not success then
         showScreenText("UI ERROR: " .. tostring(err))
     end
