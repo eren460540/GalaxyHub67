@@ -33,7 +33,14 @@ end
 
 local player = game.Players.LocalPlayer
 if not player then
-    showScreenText("LocalPlayer missing - UI bootstrap aborted")
+    local waitStart = os.clock()
+    repeat
+        task.wait()
+        player = game.Players.LocalPlayer
+    until player or (os.clock() - waitStart) >= 15
+end
+if not player then
+    showScreenText("LocalPlayer missing after 15s - UI bootstrap aborted")
     return
 end
 local playerGui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 10)
