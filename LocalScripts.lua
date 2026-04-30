@@ -38,7 +38,6 @@ if not playerGui then return end
 local lp = player
 
 local statusGuiRef, statusFrameRef, statusLabelRef, statusCopyBtnRef
-local statusConnectionsBound = false
 local currentStatusMessage = ""
 
 showScreenText = function(message)
@@ -77,6 +76,27 @@ showScreenText = function(message)
         statusCopyBtnRef.Image = "rbxassetid://6031068421"
         statusCopyBtnRef.ImageColor3 = Color3.fromRGB(200, 200, 200)
         statusCopyBtnRef.Parent = statusFrameRef
+
+        statusCopyBtnRef.MouseEnter:Connect(function()
+            statusCopyBtnRef.ImageColor3 = Color3.fromRGB(255, 255, 255)
+        end)
+        statusCopyBtnRef.MouseLeave:Connect(function()
+            statusCopyBtnRef.ImageColor3 = Color3.fromRGB(200, 200, 200)
+            statusCopyBtnRef.Size = UDim2.new(0, 20, 0, 20)
+        end)
+        statusCopyBtnRef.MouseButton1Down:Connect(function()
+            statusCopyBtnRef.Size = UDim2.new(0, 18, 0, 18)
+        end)
+        statusCopyBtnRef.MouseButton1Up:Connect(function()
+            statusCopyBtnRef.Size = UDim2.new(0, 20, 0, 20)
+        end)
+        statusCopyBtnRef.Activated:Connect(function()
+            local env = (getgenv and getgenv()) or _G
+            local copyFn = rawget(env, "setclipboard") or rawget(_G, "setclipboard")
+            if typeof(copyFn) == "function" then
+                pcall(copyFn, currentStatusMessage)
+            end
+        end)
     end
 
     if not statusLabelRef or not statusLabelRef.Parent then
@@ -101,30 +121,9 @@ showScreenText = function(message)
     currentStatusMessage = tostring(message or "")
     statusLabelRef.Text = currentStatusMessage
 
-    if not statusConnectionsBound then
-        statusConnectionsBound = true
-        statusCopyBtnRef.MouseEnter:Connect(function()
-            statusCopyBtnRef.ImageColor3 = Color3.fromRGB(255, 255, 255)
-        end)
-        statusCopyBtnRef.MouseLeave:Connect(function()
-            statusCopyBtnRef.ImageColor3 = Color3.fromRGB(200, 200, 200)
-            statusCopyBtnRef.Size = UDim2.new(0, 20, 0, 20)
-        end)
-        statusCopyBtnRef.MouseButton1Down:Connect(function()
-            statusCopyBtnRef.Size = UDim2.new(0, 18, 0, 18)
-        end)
-        statusCopyBtnRef.MouseButton1Up:Connect(function()
-            statusCopyBtnRef.Size = UDim2.new(0, 20, 0, 20)
-            local copyFn = rawget(_G, "setclipboard") or setclipboard
-            if typeof(copyFn) == "function" then
-                pcall(copyFn, currentStatusMessage)
-            end
-        end)
-    end
 end
 
-showScreenText("Galaxy UI Loaded: " .. tostring(galaxyHubAddToggle))
-showScreenText("SCRIPT EXECUTED")
+showScreenText("SCRIPT EXECUTED | Galaxy UI Loaded: " .. tostring(galaxyHubAddToggle))
 
 -- ══════════════════════════════════════════
 -- COLORS (script 2 palette + slight purple)
