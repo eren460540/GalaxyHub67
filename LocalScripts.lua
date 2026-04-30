@@ -2145,7 +2145,7 @@ closeHint.TextColor3=Color3.fromRGB(70,70,70); closeHint.Parent=topBar
 
 local fps,fAcc,fLast=60,0,tick()
 RunService.RenderStepped:Connect(function()
-    fAcc+=1; if tick()-fLast>=1 then fps=fAcc; fAcc=0; fLast=tick() end
+    fAcc = fAcc + 1; if tick()-fLast>=1 then fps=fAcc; fAcc=0; fLast=tick() end
     local ping=0; local net=Stats:FindFirstChild("Network")
     if net then local si=net:FindFirstChild("ServerStatsItem"); if si then local dp=si:FindFirstChild("Data Ping"); if dp then ping=math.floor(dp:GetValue()) end end end
     topLabel.Text="🌌 Galaxy Hub 🌌  ·  "..fps.." FPS  ·  "..ping.." ms"
