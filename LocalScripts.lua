@@ -1,4 +1,18 @@
 -- leaked by https://discord.gg/F4eknseBRK join for more sources
+-- Ensure game + (optional) Galaxy Hub UI are loaded before building toggles
+repeat task.wait() until game:IsLoaded()
+
+local galaxyHubAddToggle = rawget(_G, "AddToggle")
+if typeof(galaxyHubAddToggle) ~= "function" then
+    local startedAt = os.clock()
+    repeat
+        task.wait()
+        galaxyHubAddToggle = rawget(_G, "AddToggle")
+    until typeof(galaxyHubAddToggle) == "function" or (os.clock() - startedAt) >= 10
+end
+
+print("Galaxy UI Loaded:", galaxyHubAddToggle)
+
 print("SCRIPT EXECUTED")
 
 -- ══════════════════════════════════════════
@@ -2449,6 +2463,10 @@ local function AddToggle(section, label, onFn, offFn)
 end
 
 -- COMBAT
+if typeof(galaxyHubAddToggle) == "function" then
+    AddToggle = galaxyHubAddToggle
+end
+
 AddToggle("Combat","Melee Aimbot",
     function() meleeEnabled=true; if character then createMeleeAimbot(character) end end,
     function() disableMeleeAimbot() end)
