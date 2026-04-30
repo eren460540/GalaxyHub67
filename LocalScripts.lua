@@ -1245,6 +1245,10 @@ SETTINGS = SETTINGS or {}
 if SETTINGS.AUTOLEFT == nil then SETTINGS.AUTOLEFT = false end
 if SETTINGS.AUTORIGHT == nil then SETTINGS.AUTORIGHT = false end
 if SETTINGS.TPDOWN == nil then SETTINGS.TPDOWN = false end
+if SETTINGS.STRETCH_REZ == nil then SETTINGS.STRETCH_REZ = false end
+if SETTINGS.NIGHT_TIME == nil then SETTINGS.NIGHT_TIME = false end
+if SETTINGS.PURPLE_SKY == nil then SETTINGS.PURPLE_SKY = false end
+if SETTINGS.FPS_BOOSTER == nil then SETTINGS.FPS_BOOSTER = false end
 SETTINGS.STEAL_SPEED = tonumber(SETTINGS.STEAL_SPEED) or 29.40
 local autoPlayEnabled=false; local autoPlayGui=nil; local autoPlayHeartbeatConn=nil; local autoPlayRespawnConn=nil
 local autoPlayLeftBtn=nil; local autoPlayRightBtn=nil; local autoPlayLeftStroke=nil; local autoPlayRightStroke=nil
@@ -1642,6 +1646,117 @@ end
 -- SLOW FALL + AUTO STEAL
 -- ══════════════════════════════════════════
 local slowFallEnabled=false
+local defaultVisualLighting = {
+    Ambient = Lighting.Ambient,
+    Brightness = Lighting.Brightness,
+    FogColor = Lighting.FogColor,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows,
+    EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
+    EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
+}
+local purpleSkyApplied = false
+local fpsBoostApplied = false
+local purpleSkyRef = nil
+local purpleColorCorrection = nil
+
+local function ensurePurpleSky()
+    if purpleSkyApplied then return end
+    purpleSkyApplied = true
+    local sky = Lighting:FindFirstChild("GalaxyHubPurpleSky")
+    if not sky then
+        sky = Instance.new("Sky")
+        sky.Name = "GalaxyHubPurpleSky"
+        sky.Parent = Lighting
+    end
+    sky.SkyboxBk = "rbxassetid://159454299"
+    sky.SkyboxDn = "rbxassetid://159454296"
+    sky.SkyboxFt = "rbxassetid://159454293"
+    sky.SkyboxLf = "rbxassetid://159454286"
+    sky.SkyboxRt = "rbxassetid://159454300"
+    sky.SkyboxUp = "rbxassetid://159454288"
+    purpleSkyRef = sky
+
+    Lighting.Ambient = Color3.fromRGB(95, 65, 140)
+    Lighting.FogColor = Color3.fromRGB(120, 80, 170)
+
+    local cc = Lighting:FindFirstChild("GalaxyHubPurpleCC")
+    if not cc then
+        cc = Instance.new("ColorCorrectionEffect")
+        cc.Name = "GalaxyHubPurpleCC"
+        cc.Parent = Lighting
+    end
+    cc.TintColor = Color3.fromRGB(210, 170, 255)
+    cc.Saturation = 0.06
+    cc.Contrast = 0.08
+    purpleColorCorrection = cc
+end
+
+local function disablePurpleSky()
+    if not purpleSkyApplied then return end
+    purpleSkyApplied = false
+    Lighting.Ambient = defaultVisualLighting.Ambient
+    Lighting.FogColor = defaultVisualLighting.FogColor
+    if purpleColorCorrection and purpleColorCorrection.Parent then
+        purpleColorCorrection:Destroy()
+    end
+    purpleColorCorrection = nil
+    if purpleSkyRef and purpleSkyRef.Parent then
+        purpleSkyRef:Destroy()
+    end
+    purpleSkyRef = nil
+end
+
+local function ensureFpsBooster()
+    if fpsBoostApplied then return end
+    fpsBoostApplied = true
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 1e9
+    Lighting.EnvironmentDiffuseScale = 0
+    Lighting.EnvironmentSpecularScale = 0
+end
+
+local function disableFpsBooster()
+    if not fpsBoostApplied then return end
+    fpsBoostApplied = false
+    Lighting.GlobalShadows = defaultVisualLighting.GlobalShadows
+    Lighting.FogEnd = defaultVisualLighting.FogEnd
+    Lighting.EnvironmentDiffuseScale = defaultVisualLighting.EnvironmentDiffuseScale
+    Lighting.EnvironmentSpecularScale = defaultVisualLighting.EnvironmentSpecularScale
+end
+
+RunService.Heartbeat:Connect(function()
+    local cam = workspace.CurrentCamera
+    if cam then
+        if SETTINGS.STRETCH_REZ then
+            cam.FieldOfView = 120
+        else
+            cam.FieldOfView = 70
+        end
+    end
+
+    if SETTINGS.NIGHT_TIME then
+        Lighting.ClockTime = 0
+        Lighting.Brightness = 0.2
+        Lighting.Ambient = Color3.fromRGB(20, 20, 35)
+    else
+        Lighting.Brightness = defaultVisualLighting.Brightness
+    end
+
+    if SETTINGS.PURPLE_SKY then
+        ensurePurpleSky()
+    else
+        disablePurpleSky()
+    end
+
+    if SETTINGS.FPS_BOOSTER then
+        ensureFpsBooster()
+    else
+        disableFpsBooster()
+    end
+end)
+
 RunService.Heartbeat:Connect(function()
     if not slowFallEnabled then return end
     local char=lp.Character; if not char then return end
@@ -2248,6 +2363,10 @@ local function loadConfig()
             end
         end
         SETTINGS.TPDOWN = SETTINGS.TPDOWN == true
+        SETTINGS.STRETCH_REZ = SETTINGS.STRETCH_REZ == true
+        SETTINGS.NIGHT_TIME = SETTINGS.NIGHT_TIME == true
+        SETTINGS.PURPLE_SKY = SETTINGS.PURPLE_SKY == true
+        SETTINGS.FPS_BOOSTER = SETTINGS.FPS_BOOSTER == true
 
         if data.grabRadius ~= nil then
             local n = tonumber(data.grabRadius)
@@ -2394,6 +2513,10 @@ AddToggle("Visual","Anti Bee & Disco", function() enableAntiBee() end, function(
 AddToggle("Visual","Xray Base", function() toggleESPBases(true) end, function() toggleESPBases(false) end)
 AddToggle("Visual","Optimizer", function() enableOptimizer() end, function() disableOptimizer() end)
 AddToggle("Visual","Anti FPS Devourer", function() enableAntiFPSDevourer() end, function() disableAntiFPSDevourer() end)
+AddToggle("Visual","Stretch Rez", function() SETTINGS.STRETCH_REZ = true end, function() SETTINGS.STRETCH_REZ = false end)
+AddToggle("Visual","Night Time", function() SETTINGS.NIGHT_TIME = true end, function() SETTINGS.NIGHT_TIME = false end)
+AddToggle("Visual","Purple Sky", function() SETTINGS.PURPLE_SKY = true end, function() SETTINGS.PURPLE_SKY = false end)
+AddToggle("Visual","FPS Booster", function() SETTINGS.FPS_BOOSTER = true end, function() SETTINGS.FPS_BOOSTER = false end)
 
 -- SETTINGS
 MakeNumInput(frames["Settings"],"Steal Radius",grabRadius,1,1000,function(v) grabRadius=v; if stealCircle then stealCircle.Size=Vector3.new(0.05,v*2,v*2) end end)
