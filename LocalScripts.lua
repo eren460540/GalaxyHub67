@@ -1,3 +1,5 @@
+print("SCRIPT STARTED")
+
 -- leaked by https://discord.gg/F4eknseBRK join for more sources
 -- Ensure game + (optional) Galaxy Hub UI are loaded before building toggles
 repeat task.wait() until game:IsLoaded()
@@ -42,6 +44,17 @@ if not playerGui then
     warn("[GalaxyHub] PlayerGui missing - using CoreGui fallback")
 end
 local lp = player
+
+SETTINGS = SETTINGS or {
+    TPDOWN = false,
+    STRETCH_REZ = false,
+    NIGHT_TIME = false,
+    PURPLE_SKY = false,
+    FPS_BOOSTER = false,
+    AUTOLEFT = false,
+    AUTORIGHT = false,
+    STEAL_SPEED = 29.9,
+}
 
 print("CLIENT:", RunService:IsClient())
 print("PLAYER:", player)
@@ -2806,3 +2819,56 @@ task.delay(1, function()
 end)
 
 showScreenText("[GalaxyHub] Script finished executing.")
+
+
+local function ensureEmergencyVisibleUi()
+    local targetGuiParent = playerGui or CoreGui or player
+    if not targetGuiParent then return end
+
+    local emergencyGui = targetGuiParent:FindFirstChild("GalaxyEmergencyUI")
+    if not (emergencyGui and emergencyGui:IsA("ScreenGui")) then
+        emergencyGui = Instance.new("ScreenGui")
+        emergencyGui.Name = "GalaxyEmergencyUI"
+        emergencyGui.ResetOnSpawn = false
+        emergencyGui.IgnoreGuiInset = true
+        emergencyGui.DisplayOrder = 10002
+        emergencyGui.Enabled = true
+        emergencyGui.Parent = targetGuiParent
+    end
+
+    local label = emergencyGui:FindFirstChild("EmergencyLabel")
+    if not (label and label:IsA("TextLabel")) then
+        label = Instance.new("TextLabel")
+        label.Name = "EmergencyLabel"
+        label.Size = UDim2.new(0, 260, 0, 44)
+        label.Position = UDim2.new(0, 12, 0, 12)
+        label.BackgroundColor3 = Color3.fromRGB(30, 10, 45)
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.BorderSizePixel = 0
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 15
+        label.Text = "Galaxy UI Safe Mode"
+        label.Parent = emergencyGui
+        Instance.new("UICorner", label).CornerRadius = UDim.new(0, 8)
+    end
+end
+
+task.spawn(function()
+    print("FORCE UI INIT")
+
+    pcall(function() createSpinButton() end)
+    pcall(function() createFloatButton() end)
+    pcall(function() createDropButton() end)
+    pcall(function() createTpDownButton() end)
+    pcall(function() createLockGui() end)
+
+    local hasMainUi = false
+    pcall(function()
+        local targetGui = playerGui or (player and player:FindFirstChild("PlayerGui"))
+        hasMainUi = targetGui and (targetGui:FindFirstChild("UGC_Duels") or targetGui:FindFirstChild("UGC_SpinGui") or targetGui:FindFirstChild("UGC_FloatGui"))
+    end)
+
+    if not hasMainUi then
+        ensureEmergencyVisibleUi()
+    end
+end)
