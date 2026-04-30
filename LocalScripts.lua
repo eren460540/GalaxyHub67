@@ -32,16 +32,21 @@ if not RunService:IsClient() then
 end
 
 local player = game.Players.LocalPlayer
-if not player then return end
+if not player then
+    showScreenText("LocalPlayer missing - UI bootstrap aborted")
+    return
+end
 local playerGui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 10)
-if not playerGui then return end
+if not playerGui then
+    showScreenText("PlayerGui missing after 10s - using CoreGui fallback")
+end
 local lp = player
 
 local statusGuiRef, statusFrameRef, statusLabelRef, statusCopyBtnRef
 local currentStatusMessage = ""
 
 showScreenText = function(message)
-    local targetGuiParent = playerGui or CoreGui
+    local targetGuiParent = playerGui or CoreGui or player
     if not targetGuiParent then return end
 
     if not statusGuiRef or not statusGuiRef.Parent then
@@ -52,6 +57,8 @@ showScreenText = function(message)
             statusGuiRef.ResetOnSpawn = false
             statusGuiRef.IgnoreGuiInset = true
             statusGuiRef.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            statusGuiRef.DisplayOrder = 10000
+            statusGuiRef.Enabled = true
             statusGuiRef.Parent = targetGuiParent
         end
     end
@@ -123,7 +130,21 @@ showScreenText = function(message)
 
 end
 
-showScreenText("SCRIPT EXECUTED | Galaxy UI Loaded: " .. tostring(galaxyHubAddToggle))
+showScreenText("SCRIPT EXECUTED / UI BOOTING | Galaxy UI Loaded: " .. tostring(galaxyHubAddToggle))
+
+
+local function finalizeScreenGui(gui)
+    if not (gui and gui:IsA("ScreenGui")) then return end
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 10000
+    gui.Enabled = true
+    if playerGui then
+        gui.Parent = playerGui
+    elseif CoreGui then
+        gui.Parent = CoreGui
+    end
+end
 
 -- ══════════════════════════════════════════
 -- COLORS (script 2 palette + slight purple)
@@ -884,8 +905,8 @@ end
 
 function createLockGui()
     if lockGui then return end
-    local success, err = pcall(function()
-        lockGui = Instance.new("ScreenGui"); lockGui.Name="UGC_LockTarget"; lockGui.ResetOnSpawn=false; lockGui.IgnoreGuiInset=true; lockGui.Parent=playerGui
+    local success, err = xpcall(function()
+        lockGui = Instance.new("ScreenGui"); lockGui.Name="UGC_LockTarget"; finalizeScreenGui(lockGui)
         local btn = Instance.new("TextButton")
         btn.Size=UDim2.new(0,125,0,41)
         btn.BackgroundColor3=BTN_DARK; btn.Text="LOCK ON"; btn.Font=Enum.Font.GothamBlack
@@ -1063,8 +1084,8 @@ end
 
 local function createFloatButton()
     if floatGui then return end
-    local success, err = pcall(function()
-    floatGui=Instance.new("ScreenGui"); floatGui.Name="UGC_FloatGui"; floatGui.ResetOnSpawn=false; floatGui.IgnoreGuiInset=true; floatGui.Parent=playerGui
+    local success, err = xpcall(function()
+    floatGui=Instance.new("ScreenGui"); floatGui.Name="UGC_FloatGui"; finalizeScreenGui(floatGui)
     local button=Instance.new("TextButton")
     button.Size=UDim2.new(0,125,0,41)
     button.BackgroundColor3=BTN_DARK; button.Text="FLOAT"; button.Font=Enum.Font.GothamBlack
@@ -1115,7 +1136,7 @@ end
 local function createDropButton()
     if dropGui then return end
     local success, err = pcall(function()
-    dropGui=Instance.new("ScreenGui"); dropGui.Name="UGC_DropGui"; dropGui.ResetOnSpawn=false; dropGui.IgnoreGuiInset=true; dropGui.Parent=playerGui
+    dropGui=Instance.new("ScreenGui"); dropGui.Name="UGC_DropGui"; finalizeScreenGui(dropGui)
     local button=Instance.new("TextButton")
     button.Size=UDim2.new(0,125,0,41)
     button.BackgroundColor3=BTN_DARK; button.Text="DROP"; button.Font=Enum.Font.GothamBlack
@@ -1225,7 +1246,7 @@ local function createTpDownButton()
     end
 
     local success, err = pcall(function()
-        tpDownGui=Instance.new("ScreenGui"); tpDownGui.Name="UGC_TpDownGui"; tpDownGui.ResetOnSpawn=false; tpDownGui.IgnoreGuiInset=true; tpDownGui.Parent=playerGui
+        tpDownGui=Instance.new("ScreenGui"); tpDownGui.Name="UGC_TpDownGui"; finalizeScreenGui(tpDownGui)
         local button=Instance.new("TextButton")
         button.Size=UDim2.new(0,125,0,41)
         button.BackgroundColor3=BTN_DARK; button.Text="TP DOWN"; button.Font=Enum.Font.GothamBlack
@@ -1294,7 +1315,7 @@ local function stopSpinBody() if spinForce then spinForce:Destroy(); spinForce=n
 local function createSpinButton()
     if spinGui then return end
     local success, err = pcall(function()
-    spinGui=Instance.new("ScreenGui"); spinGui.Name="UGC_SpinGui"; spinGui.ResetOnSpawn=false; spinGui.IgnoreGuiInset=true; spinGui.Parent=playerGui
+    spinGui=Instance.new("ScreenGui"); spinGui.Name="UGC_SpinGui"; finalizeScreenGui(spinGui)
     local button=Instance.new("TextButton")
     button.Size=UDim2.new(0,125,0,41)
     button.BackgroundColor3=BTN_DARK; button.Text="SPIN"; button.Font=Enum.Font.GothamBlack
@@ -1340,15 +1361,6 @@ end
 local speedBox, stealBox, configPasteBox
 
 -- ─── AUTO PLAY ──────────────────────────────────────────
-SETTINGS = SETTINGS or {}
-if SETTINGS.AUTOLEFT == nil then SETTINGS.AUTOLEFT = false end
-if SETTINGS.AUTORIGHT == nil then SETTINGS.AUTORIGHT = false end
-if SETTINGS.TPDOWN == nil then SETTINGS.TPDOWN = false end
-if SETTINGS.STRETCH_REZ == nil then SETTINGS.STRETCH_REZ = false end
-if SETTINGS.NIGHT_TIME == nil then SETTINGS.NIGHT_TIME = false end
-if SETTINGS.PURPLE_SKY == nil then SETTINGS.PURPLE_SKY = false end
-if SETTINGS.FPS_BOOSTER == nil then SETTINGS.FPS_BOOSTER = false end
-SETTINGS.STEAL_SPEED = tonumber(SETTINGS.STEAL_SPEED) or 29.40
 local autoPlayEnabled=false; local autoPlayGui=nil; local autoPlayHeartbeatConn=nil; local autoPlayRespawnConn=nil
 local autoPlayLeftBtn=nil; local autoPlayRightBtn=nil; local autoPlayLeftStroke=nil; local autoPlayRightStroke=nil
 local LeftPhase, RightPhase = 1, 1
@@ -1490,7 +1502,7 @@ end
 local function createAutoPlayGui()
     if autoPlayGui then return end
     local success, err = pcall(function()
-    autoPlayGui=Instance.new("ScreenGui"); autoPlayGui.Name="UGC_AutoPlayGui"; autoPlayGui.ResetOnSpawn=false; autoPlayGui.IgnoreGuiInset=true; autoPlayGui.Parent=playerGui
+    autoPlayGui=Instance.new("ScreenGui"); autoPlayGui.Name="UGC_AutoPlayGui"; finalizeScreenGui(autoPlayGui)
 
     local holder=Instance.new("Frame")
     holder.Size=UDim2.new(0,125,0,41)
@@ -1653,7 +1665,7 @@ end
 local scGui
 local infiniteJumpEnabled=false
 local scSuccess, scErr = pcall(function()
-scGui = Instance.new("ScreenGui"); scGui.Name="UGC_SpeedCustomizer"; scGui.ResetOnSpawn=false; scGui.Enabled=false; scGui.Parent=playerGui
+scGui = Instance.new("ScreenGui"); scGui.Name="UGC_SpeedCustomizer"; finalizeScreenGui(scGui); scGui.Enabled=false
 
 local scFrame = Instance.new("Frame"); scFrame.Name="MainFrame"
 scFrame.Size=UDim2.new(0,240,0,200); scFrame.AnchorPoint=Vector2.new(1,0.5)
@@ -2053,13 +2065,7 @@ local autoBatActive=false; local autoBatLoop=nil; local savedAnimate=nil
 -- MAIN SCREEN GUI
 -- ══════════════════════════════════════════
 local success, err = pcall(function()
-local sg=Instance.new("ScreenGui"); sg.Name="UGC_Duels"; sg.ResetOnSpawn=false; sg.IgnoreGuiInset=true
-pcall(function()
-    sg.Parent = CoreGui
-end)
-if sg.Parent ~= CoreGui then
-    sg.Parent = playerGui
-end
+local sg=Instance.new("ScreenGui"); sg.Name="UGC_Duels"; finalizeScreenGui(sg)
 showScreenText("MAIN UI CREATED")
 
 -- Progress bar
@@ -2550,6 +2556,8 @@ end
 -- COMBAT
 if typeof(galaxyHubAddToggle) == "function" then
     AddToggle = galaxyHubAddToggle
+else
+    showScreenText("_G.AddToggle missing after 10s - using standalone fallback UI")
 end
 
 AddToggle("Combat","Melee Aimbot",
@@ -2692,9 +2700,12 @@ dcBtn.TextColor3=Color3.fromRGB(130,130,130); dcBtn.Parent=dcRow
 dcBtn.MouseButton1Click:Connect(function() pcall(function() setclipboard("https://discord.gg/F4eknseBRK") end); dcBtn.Text="✅  Copied!"; task.wait(1.5); dcBtn.Text="📋  https://discord.gg/F4eknseBRK" end)
 
 ShowSection("Combat")
-sg.Enabled = true
+layoutMainUi()
 showMenu()
+sg.Enabled = true
 showScreenText("[GalaxyHub] UI initialization complete.")
+end, function(startErr)
+    return debug.traceback(tostring(startErr), 2)
 end)
 
 if not success then
@@ -2702,13 +2713,13 @@ if not success then
 end
 
 task.delay(1, function()
-    if not playerGui:FindFirstChild("UGC_Duels") then
+    local targetGui = playerGui or (player and player:FindFirstChild("PlayerGui"))
+    if targetGui and not targetGui:FindFirstChild("UGC_Duels") then
         showScreenText("UI DID NOT CREATE - FORCING TEST BUTTON")
 
         local test = Instance.new("ScreenGui")
         test.Name = "TEST_GUI"
-        test.ResetOnSpawn = false
-        test.Parent = playerGui
+        finalizeScreenGui(test)
 
         local btn = Instance.new("TextLabel")
         btn.Size = UDim2.new(0,200,0,50)
