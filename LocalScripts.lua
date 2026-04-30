@@ -26,28 +26,63 @@ local HttpService        = game:GetService("HttpService")
 local CoreGui            = game:GetService("CoreGui")
 local function showScreenText(_) end
 
-if not RunService:IsClient() then
-    showScreenText("NOT RUNNING ON CLIENT - UI WILL NOT SHOW")
-    return
+while not RunService:IsClient() do
+    warn("[GalaxyHub] Waiting for client context...")
+    task.wait()
 end
 
 local player = game.Players.LocalPlayer
-if not player then
-    local waitStart = os.clock()
-    repeat
-        task.wait()
-        player = game.Players.LocalPlayer
-    until player or (os.clock() - waitStart) >= 15
+while not player do
+    warn("[GalaxyHub] Waiting for LocalPlayer...")
+    task.wait()
+    player = game.Players.LocalPlayer
 end
-if not player then
-    showScreenText("LocalPlayer missing after 15s - UI bootstrap aborted")
-    return
-end
-local playerGui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 10)
+local playerGui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui")
 if not playerGui then
-    showScreenText("PlayerGui missing after 10s - using CoreGui fallback")
+    warn("[GalaxyHub] PlayerGui missing - using CoreGui fallback")
 end
 local lp = player
+
+print("CLIENT:", RunService:IsClient())
+print("PLAYER:", player)
+print("PLAYERGUI:", playerGui)
+
+local function createFallbackDebugUi()
+    local targetGuiParent = playerGui or CoreGui or player
+    if not targetGuiParent then
+        warn("[GalaxyHub] No gui parent available for fallback UI.")
+        return
+    end
+
+    local dbg = targetGuiParent:FindFirstChild("GalaxyFallbackDebugGui")
+    if not (dbg and dbg:IsA("ScreenGui")) then
+        dbg = Instance.new("ScreenGui")
+        dbg.Name = "GalaxyFallbackDebugGui"
+        dbg.ResetOnSpawn = false
+        dbg.IgnoreGuiInset = true
+        dbg.DisplayOrder = 10001
+        dbg.Enabled = true
+        dbg.Parent = targetGuiParent
+    end
+
+    local lbl = dbg:FindFirstChild("FallbackLabel")
+    if not (lbl and lbl:IsA("TextLabel")) then
+        lbl = Instance.new("TextLabel")
+        lbl.Name = "FallbackLabel"
+        lbl.Size = UDim2.new(0, 430, 0, 46)
+        lbl.Position = UDim2.new(0.5, -215, 0, 30)
+        lbl.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        lbl.BorderSizePixel = 0
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 18
+        lbl.Text = "[GalaxyHub] Client script executed."
+        lbl.Parent = dbg
+        Instance.new("UICorner", lbl).CornerRadius = UDim.new(0, 10)
+    end
+end
+
+createFallbackDebugUi()
 
 local statusGuiRef, statusFrameRef, statusLabelRef, statusCopyBtnRef
 local currentStatusMessage = ""
@@ -2581,7 +2616,8 @@ end
 if typeof(galaxyHubAddToggle) == "function" then
     AddToggle = galaxyHubAddToggle
 else
-    showScreenText("_G.AddToggle missing after 10s - using standalone fallback UI")
+    warn("[GalaxyHub] _G.AddToggle missing - using standalone fallback UI")
+    showScreenText("_G.AddToggle missing - using standalone fallback UI")
 end
 
 AddToggle("Combat","Melee Aimbot",
@@ -2727,6 +2763,20 @@ ShowSection("Combat")
 layoutMainUi()
 showMenu()
 sg.Enabled = true
+print("UI INIT START")
+local forcedInitFns = {
+    createSpinButton,
+    createFloatButton,
+    createDropButton,
+    createTpDownButton,
+    createLockGui
+}
+for _, initFn in ipairs(forcedInitFns) do
+    local okInit, initErr = pcall(initFn)
+    if not okInit then
+        warn("[GalaxyHub] Forced UI init failed:", tostring(initErr))
+    end
+end
 showScreenText("[GalaxyHub] UI initialization complete.")
 end, function(startErr)
     return debug.traceback(tostring(startErr), 2)
