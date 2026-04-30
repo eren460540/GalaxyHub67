@@ -1472,7 +1472,10 @@ local function startAutoPlayHeartbeat()
         local activeSide = SETTINGS.AUTOLEFT and "Left" or (SETTINGS.AUTORIGHT and "Right" or nil)
         if not activeSide then return end
 
-        local phase = (activeSide=="Left") and LeftPhase or RightPhase
+        local phase = LeftPhase
+        if activeSide ~= "Left" then
+            phase = RightPhase
+        end
         local target = getCurrentAutoPlayTarget(activeSide, phase)
         if not target then
             if activeSide=="Left" then
