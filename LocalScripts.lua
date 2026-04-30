@@ -1741,7 +1741,9 @@ RunService.Heartbeat:Connect(function()
         Lighting.Brightness = 0.2
         Lighting.Ambient = Color3.fromRGB(20, 20, 35)
     else
+        Lighting.ClockTime = 14
         Lighting.Brightness = defaultVisualLighting.Brightness
+        Lighting.Ambient = defaultVisualLighting.Ambient
     end
 
     if SETTINGS.PURPLE_SKY then
