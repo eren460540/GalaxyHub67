@@ -11,10 +11,6 @@ if typeof(galaxyHubAddToggle) ~= "function" then
     until typeof(galaxyHubAddToggle) == "function" or (os.clock() - startedAt) >= 10
 end
 
-print("Galaxy UI Loaded:", galaxyHubAddToggle)
-
-print("SCRIPT EXECUTED")
-
 -- ══════════════════════════════════════════
 -- SERVICES
 -- ══════════════════════════════════════════
@@ -28,9 +24,10 @@ local ContextActionService = game:GetService("ContextActionService")
 local GuiService         = game:GetService("GuiService")
 local HttpService        = game:GetService("HttpService")
 local CoreGui            = game:GetService("CoreGui")
+local function showScreenText(_) end
 
 if not RunService:IsClient() then
-    warn("NOT RUNNING ON CLIENT - UI WILL NOT SHOW")
+    showScreenText("NOT RUNNING ON CLIENT - UI WILL NOT SHOW")
     return
 end
 
@@ -39,6 +36,95 @@ if not player then return end
 local playerGui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 10)
 if not playerGui then return end
 local lp = player
+
+local statusGuiRef, statusFrameRef, statusLabelRef, statusCopyBtnRef
+local statusConnectionsBound = false
+local currentStatusMessage = ""
+
+showScreenText = function(message)
+    local targetGuiParent = playerGui or CoreGui
+    if not targetGuiParent then return end
+
+    if not statusGuiRef or not statusGuiRef.Parent then
+        statusGuiRef = targetGuiParent:FindFirstChild("GalaxyStatusGui")
+        if not (statusGuiRef and statusGuiRef:IsA("ScreenGui")) then
+            statusGuiRef = Instance.new("ScreenGui")
+            statusGuiRef.Name = "GalaxyStatusGui"
+            statusGuiRef.ResetOnSpawn = false
+            statusGuiRef.IgnoreGuiInset = true
+            statusGuiRef.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            statusGuiRef.Parent = targetGuiParent
+        end
+    end
+
+    if not statusFrameRef or not statusFrameRef.Parent then
+        statusFrameRef = Instance.new("Frame")
+        statusFrameRef.Name = "StatusFrame"
+        statusFrameRef.BackgroundTransparency = 1
+        statusFrameRef.AnchorPoint = Vector2.new(0.5, 0.5)
+        statusFrameRef.Position = UDim2.new(0.5, 0, 0.5, 0)
+        statusFrameRef.Size = UDim2.new(0, 530, 0, 80)
+        statusFrameRef.Parent = statusGuiRef
+    end
+
+    if not statusCopyBtnRef or not statusCopyBtnRef.Parent then
+        statusCopyBtnRef = Instance.new("ImageButton")
+        statusCopyBtnRef.Name = "CopyButton"
+        statusCopyBtnRef.BackgroundTransparency = 1
+        statusCopyBtnRef.Size = UDim2.new(0, 20, 0, 20)
+        statusCopyBtnRef.AnchorPoint = Vector2.new(0, 0.5)
+        statusCopyBtnRef.Position = UDim2.new(0, 0, 0.5, 0)
+        statusCopyBtnRef.Image = "rbxassetid://6031068421"
+        statusCopyBtnRef.ImageColor3 = Color3.fromRGB(200, 200, 200)
+        statusCopyBtnRef.Parent = statusFrameRef
+    end
+
+    if not statusLabelRef or not statusLabelRef.Parent then
+        statusLabelRef = Instance.new("TextLabel")
+        statusLabelRef.Name = "StatusText"
+        statusLabelRef.BackgroundTransparency = 1
+        statusLabelRef.AnchorPoint = Vector2.new(0, 0.5)
+        statusLabelRef.Position = UDim2.new(0, 30, 0.5, 0)
+        statusLabelRef.Size = UDim2.new(0, 500, 0, 80)
+        statusLabelRef.Font = Enum.Font.GothamBlack
+        statusLabelRef.TextSize = 30
+        statusLabelRef.TextColor3 = Color3.fromRGB(157, 78, 221)
+        statusLabelRef.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        statusLabelRef.TextStrokeTransparency = 0
+        statusLabelRef.TextScaled = false
+        statusLabelRef.TextWrapped = true
+        statusLabelRef.TextXAlignment = Enum.TextXAlignment.Left
+        statusLabelRef.TextYAlignment = Enum.TextYAlignment.Center
+        statusLabelRef.Parent = statusFrameRef
+    end
+
+    currentStatusMessage = tostring(message or "")
+    statusLabelRef.Text = currentStatusMessage
+
+    if not statusConnectionsBound then
+        statusConnectionsBound = true
+        statusCopyBtnRef.MouseEnter:Connect(function()
+            statusCopyBtnRef.ImageColor3 = Color3.fromRGB(255, 255, 255)
+        end)
+        statusCopyBtnRef.MouseLeave:Connect(function()
+            statusCopyBtnRef.ImageColor3 = Color3.fromRGB(200, 200, 200)
+            statusCopyBtnRef.Size = UDim2.new(0, 20, 0, 20)
+        end)
+        statusCopyBtnRef.MouseButton1Down:Connect(function()
+            statusCopyBtnRef.Size = UDim2.new(0, 18, 0, 18)
+        end)
+        statusCopyBtnRef.MouseButton1Up:Connect(function()
+            statusCopyBtnRef.Size = UDim2.new(0, 20, 0, 20)
+            local copyFn = rawget(_G, "setclipboard") or setclipboard
+            if typeof(copyFn) == "function" then
+                pcall(copyFn, currentStatusMessage)
+            end
+        end)
+    end
+end
+
+showScreenText("Galaxy UI Loaded: " .. tostring(galaxyHubAddToggle))
+showScreenText("SCRIPT EXECUTED")
 
 -- ══════════════════════════════════════════
 -- COLORS (script 2 palette + slight purple)
@@ -838,7 +924,7 @@ function createLockGui()
         end)
     end)
     if not success then
-        warn("UI ERROR:", err)
+        showScreenText("UI ERROR: " .. tostring(err))
     end
 end
 function destroyLockGui()
@@ -1016,7 +1102,7 @@ local function createFloatButton()
     end)
     end)
     if not success then
-        warn("UI ERROR:", err)
+        showScreenText("UI ERROR: " .. tostring(err))
     end
 end
 
@@ -1069,7 +1155,7 @@ local function createDropButton()
     end)
     end)
     if not success then
-        warn("UI ERROR:", err)
+        showScreenText("UI ERROR: " .. tostring(err))
     end
 end
 
@@ -1185,7 +1271,7 @@ local function createTpDownButton()
         if tpDownEnabled then startTpDown() else stopTpDown() end
     end)
     if not success then
-        warn("UI ERROR:", err)
+        showScreenText("UI ERROR: " .. tostring(err))
     end
 end
 
@@ -1241,7 +1327,7 @@ local function createSpinButton()
     end)
     end)
     if not success then
-        warn("UI ERROR:", err)
+        showScreenText("UI ERROR: " .. tostring(err))
     end
 end
 local function removeSpinButton()
@@ -1497,7 +1583,7 @@ local function createAutoPlayGui()
     startAutoPlayHeartbeat()
     end)
     if not success then
-        warn("UI ERROR:", err)
+        showScreenText("UI ERROR: " .. tostring(err))
     end
 end
 
@@ -1589,7 +1675,7 @@ local scDragOk, scDragErr = pcall(function()
     makeDraggable(scFrame, scDragBar)
 end)
 if not scDragOk then
-    warn("[Galaxy Hub] Speed Customizer drag setup failed:", scDragErr)
+    showScreenText("[Galaxy Hub] Speed Customizer drag setup failed: " .. tostring(scDragErr))
 end
 
 -- activate button
@@ -1653,7 +1739,7 @@ UserInputService.JumpRequest:Connect(function()
 end)
 end)
 if not scSuccess then
-    warn("UI ERROR:", scErr)
+    showScreenText("UI ERROR: " .. tostring(scErr))
 end
 
 -- ══════════════════════════════════════════
@@ -1975,7 +2061,7 @@ end)
 if sg.Parent ~= CoreGui then
     sg.Parent = playerGui
 end
-print("MAIN UI CREATED")
+showScreenText("MAIN UI CREATED")
 
 -- Progress bar
 local pbBg=Instance.new("Frame"); pbBg.Size=UDim2.new(0,260,0,13); pbBg.Position=UDim2.new(0.5,-130,0,8)
@@ -2213,7 +2299,7 @@ local sectionsBuiltOk, sectionBuildErr = pcall(function()
     layoutMainUi()
 end)
 if not sectionsBuiltOk then
-    warn("[Galaxy Hub] Section/tab setup failed:", sectionBuildErr)
+    showScreenText("[Galaxy Hub] Section/tab setup failed: " .. tostring(sectionBuildErr))
     ShowSection = ShowSection or function() end
 end
 
@@ -2609,16 +2695,16 @@ dcBtn.MouseButton1Click:Connect(function() pcall(function() setclipboard("https:
 ShowSection("Combat")
 sg.Enabled = true
 showMenu()
-print("[GalaxyHub] UI initialization complete.")
+showScreenText("[GalaxyHub] UI initialization complete.")
 end)
 
 if not success then
-    warn("UI CREATION FAILED:", err)
+    showScreenText("UI CREATION FAILED: " .. tostring(err))
 end
 
 task.delay(1, function()
     if not playerGui:FindFirstChild("UGC_Duels") then
-        warn("UI DID NOT CREATE - FORCING TEST BUTTON")
+        showScreenText("UI DID NOT CREATE - FORCING TEST BUTTON")
 
         local test = Instance.new("ScreenGui")
         test.Name = "TEST_GUI"
@@ -2635,4 +2721,4 @@ task.delay(1, function()
     end
 end)
 
-print("[GalaxyHub] Script finished executing.")
+showScreenText("[GalaxyHub] Script finished executing.")
